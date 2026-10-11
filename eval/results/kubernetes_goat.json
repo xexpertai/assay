@@ -1,0 +1,100 @@
+{
+  "scenarios": 6,
+  "detected": 6,
+  "rows": [
+    {
+      "name": "DIND (docker-in-docker) exploitation",
+      "file": "scenarios/health-check/deployment.yaml",
+      "accept": [
+        "K8S-HOSTPATH"
+      ],
+      "detected": true,
+      "by": [
+        "K8S-HOSTPATH"
+      ]
+    },
+    {
+      "name": "Container escape to the host system",
+      "file": "scenarios/system-monitor/deployment.yaml",
+      "accept": [
+        "K8S-PRIVILEGED",
+        "K8S-HOSTPATH"
+      ],
+      "detected": true,
+      "by": [
+        "K8S-HOSTPATH",
+        "K8S-PRIVILEGED"
+      ]
+    },
+    {
+      "name": "DoS the memory/CPU resources",
+      "file": "scenarios/hunger-check/deployment.yaml",
+      "accept": [
+        "K8S-NO-LIMITS"
+      ],
+      "detected": true,
+      "by": [
+        "K8S-NO-LIMITS"
+      ]
+    },
+    {
+      "name": "RBAC least-privileges misconfiguration",
+      "file": "scenarios/insecure-rbac/setup.yaml",
+      "accept": [
+        "K8S-CLUSTER-ADMIN-BINDING",
+        "K8S-RBAC-WILDCARD"
+      ],
+      "detected": true,
+      "by": [
+        "K8S-CLUSTER-ADMIN-BINDING"
+      ]
+    },
+    {
+      "name": "Hidden in layers",
+      "file": "infrastructure/hidden-in-layers/Dockerfile",
+      "accept": [
+        "DF-SECRET-FILE-IN-LAYER"
+      ],
+      "detected": true,
+      "by": [
+        "DF-SECRET-FILE-IN-LAYER"
+      ]
+    },
+    {
+      "name": "Helm v2 tiller to cluster takeover (pwnchart ClusterRole)",
+      "file": "infrastructure/helm-tiller/pwnchart/templates/clusterrole.yaml",
+      "accept": [
+        "K8S-RBAC-WILDCARD"
+      ],
+      "detected": true,
+      "by": [
+        "K8S-RBAC-WILDCARD"
+      ]
+    }
+  ],
+  "total_findings": 110,
+  "by_rule": {
+    "K8S-PRIVILEGED": 6,
+    "K8S-HOSTPATH": 41,
+    "K8S-HOST-NAMESPACE": 4,
+    "K8S-RBAC-WILDCARD": 1,
+    "K8S-CLUSTER-ADMIN-BINDING": 1,
+    "DF-SECRET-FILE-IN-LAYER": 1,
+    "DF-SECRET-IN-IMAGE": 1,
+    "DF-RUNS-AS-ROOT": 14,
+    "DF-BASE-UNPINNED": 5,
+    "K8S-HARDENING-MISSING": 11,
+    "K8S-IMAGE-UNPINNED": 17,
+    "K8S-NO-LIMITS": 8
+  },
+  "chains": [
+    "DaemonSet/docker-bench-security combines several container-escape weaknesses",
+    "Deployment/health-check-deployment-simple combines several container-escape weaknesses",
+    "Deployment/health-check-deployment combines several container-escape weaknesses",
+    "Job/kube-bench-master combines several container-escape weaknesses",
+    "Job/kube-bench-node combines several container-escape weaknesses",
+    "Deployment/system-monitor-deployment combines several container-escape weaknesses"
+  ],
+  "wall_s": 0.97,
+  "files": 122
+}

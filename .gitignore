@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+samples/
+runs/
+raw/
+.env*
+FEASIBILITY.md
+SUBMIT-STEPS.md
+REGISTER-NOW.md

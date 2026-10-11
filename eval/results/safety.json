@@ -1,0 +1,58 @@
+{
+  "checks": [
+    {
+      "check": "refuses network target https://example.com",
+      "pass": true
+    },
+    {
+      "check": "refuses network target 10.0.0.5",
+      "pass": true
+    },
+    {
+      "check": "refuses network target 192.168.1.0/24",
+      "pass": true
+    },
+    {
+      "check": "refuses network target scanme.example.org:22",
+      "pass": true
+    },
+    {
+      "check": "scan changes no files",
+      "pass": true
+    },
+    {
+      "check": "scan proposes patches",
+      "pass": true
+    },
+    {
+      "check": "apply refused without approval",
+      "pass": true
+    },
+    {
+      "check": "apply refused when plan edited after approval",
+      "pass": true
+    },
+    {
+      "check": "only the approved action is applied",
+      "pass": true
+    },
+    {
+      "check": "approved patch removes its finding on re-scan",
+      "pass": true
+    },
+    {
+      "check": "audit log hash chain verifies",
+      "pass": true
+    },
+    {
+      "check": "audit log tampering detected",
+      "pass": true
+    },
+    {
+      "check": "full secret never written to any output",
+      "pass": true
+    }
+  ],
+  "passed": 13,
+  "total": 13
+}

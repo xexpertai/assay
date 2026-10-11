@@ -1,0 +1,56 @@
+{
+  "model": "gemma-4-E2B-it-Q4_0 via llama.cpp b11555, CPU, 4 threads, laptop shared with other jobs, 3 GB memory cap",
+  "runs": {
+    "terragoat": {
+      "author": "gemma-4-E2B-it-Q4_0 (local, llama.cpp), checked against the facts",
+      "text": {
+        "summary": "There are critical risks associated with publicly accessible databases and hard-coded provider credentials. The most serious path involves an internet-reachable database carrying plaintext credentials.",
+        "first_steps": [
+          {
+            "finding_id": "F-16cfb42e",
+            "why": "Address the hard-coded provider credential 'access_key' to prevent credential exposure."
+          },
+          {
+            "finding_id": "F-19378afd",
+            "why": "Restrict inbound SSH access (port 22) on the security group to prevent internet-wide access."
+          },
+          {
+            "finding_id": "F-ea319cad",
+            "why": "Restrict public access to the database instance to limit exposure."
+          }
+        ]
+      },
+      "validation": [],
+      "stats": {
+        "wall_s": 35.8,
+        "output_tokens": 147
+      }
+    },
+    "kubernetes-goat": {
+      "author": "gemma-4-E2B-it-Q4_0 (local, llama.cpp), checked against the facts",
+      "text": {
+        "summary": "There are 14 critical findings, primarily related to containers running with excessive privileges and mounting sensitive host paths. The most serious risk involves container escape weaknesses identified in multiple attack chains.",
+        "first_steps": [
+          {
+            "finding_id": "F-a6ea085e",
+            "why": "Address the finding 'Container runs privileged' to reduce the potential impact of container escapes."
+          },
+          {
+            "finding_id": "F-05f3e8da",
+            "why": "Remediate the finding 'Pod mounts host path /' to prevent unauthorized access to the host filesystem."
+          },
+          {
+            "finding_id": "F-4706c186",
+            "why": "Mitigate the risk of container escape by removing the mount of host path /var/run/docker.sock."
+          }
+        ]
+      },
+      "validation": [],
+      "stats": {
+        "wall_s": 37.4,
+        "output_tokens": 209
+      }
+    }
+  },
+  "manual_review": "Both briefings passed the automatic grounding checks (finding IDs, numbers, no claimed actions). Manual reading found one wording inaccuracy in the TerraGoat briefing: it calls the critical chain an 'internet-reachable database', but the chain is about the EC2 instance aws_instance.db_app. The validator does not catch paraphrase errors like this, so the deterministic template stays the default and model text is labelled."
+}

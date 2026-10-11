@@ -1,0 +1,13 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: some-org/setup-tool@3f1c9a2b4d5e6f708192a3b4c5d6e7f8091a2b3c
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: echo "PR: $TITLE"

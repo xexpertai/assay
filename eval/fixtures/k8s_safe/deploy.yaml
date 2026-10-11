@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  template:
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: web
+          image: registry.example.com/web:3.2.1
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: web-db, key: password}
+            - name: LOG_LEVEL
+              value: info
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits: {cpu: "500m", memory: "256Mi"}

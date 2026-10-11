@@ -1,0 +1,7 @@
+services:
+  monitor:
+    image: monitor:1.2
+    privileged: true
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

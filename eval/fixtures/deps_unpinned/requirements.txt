@@ -1,0 +1,3 @@
+--extra-index-url http://pypi.internal.example/simple
+requests
+flask==3.0.3

@@ -1,0 +1,600 @@
+{
+  "labels_total": 29,
+  "detected_total": 17,
+  "labels_in_rule_coverage": 17,
+  "detected_in_coverage": 17,
+  "recall_all": 0.586,
+  "recall_in_coverage": 1.0,
+  "rows": [
+    {
+      "file": "terraform/aws/db-app.tf",
+      "resource": "aws_instance.db_app",
+      "annotation": "ec2 have plain text secrets in user data",
+      "accept": [
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ]
+    },
+    {
+      "file": "terraform/aws/ec2.tf",
+      "resource": "aws_instance.web_host",
+      "annotation": "ec2 have plain text secrets in user data",
+      "accept": [
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ]
+    },
+    {
+      "file": "terraform/aws/ec2.tf",
+      "resource": "aws_ebs_volume.web_host_storage",
+      "annotation": "unencrypted volume",
+      "accept": [
+        "TF-AWS-EBS-UNENCRYPTED"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-EBS-UNENCRYPTED"
+      ]
+    },
+    {
+      "file": "terraform/aws/ec2.tf",
+      "resource": "aws_ebs_snapshot.example_snapshot",
+      "annotation": "ebs snapshot without encryption",
+      "accept": [
+        "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED"
+      ]
+    },
+    {
+      "file": "terraform/aws/ec2.tf",
+      "resource": "aws_security_group.web-node",
+      "annotation": "security group is open to the world in SSH port",
+      "accept": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ]
+    },
+    {
+      "file": "terraform/aws/kms.tf",
+      "resource": "aws_kms_key.logs_key",
+      "annotation": "key does not have rotation enabled",
+      "accept": [
+        "TF-AWS-KMS-NO-ROTATION"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-KMS-NO-ROTATION"
+      ]
+    },
+    {
+      "file": "terraform/aws/lambda.tf",
+      "resource": "aws_lambda_function.analysis_lambda",
+      "annotation": "lambda have plain text secrets in environment variables",
+      "accept": [
+        "TF-AWS-LAMBDA-ENV-SECRET"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-LAMBDA-ENV-SECRET"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.data",
+      "annotation": "bucket is public",
+      "accept": [
+        "TF-AWS-S3-PUBLIC-ACL",
+        "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.data",
+      "annotation": "bucket is not encrypted",
+      "accept": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.data",
+      "annotation": "bucket does not have access logs",
+      "accept": [
+        "TF-AWS-S3-NO-LOGGING"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-LOGGING"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.data",
+      "annotation": "bucket does not have versioning",
+      "accept": [
+        "TF-AWS-S3-NO-VERSIONING"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-VERSIONING"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.financials",
+      "annotation": "bucket is not encrypted",
+      "accept": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.financials",
+      "annotation": "bucket does not have access logs",
+      "accept": [
+        "TF-AWS-S3-NO-LOGGING"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-LOGGING"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.financials",
+      "annotation": "bucket does not have versioning",
+      "accept": [
+        "TF-AWS-S3-NO-VERSIONING"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-VERSIONING"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.operations",
+      "annotation": "bucket is not encrypted",
+      "accept": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.operations",
+      "annotation": "bucket does not have access logs",
+      "accept": [
+        "TF-AWS-S3-NO-LOGGING"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-LOGGING"
+      ]
+    },
+    {
+      "file": "terraform/aws/s3.tf",
+      "resource": "aws_s3_bucket.data_science",
+      "annotation": "bucket is not encrypted",
+      "accept": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ],
+      "detected": true,
+      "by": [
+        "TF-AWS-S3-NO-ENCRYPTION"
+      ]
+    },
+    {
+      "file": "terraform/alicloud/bucket.tf",
+      "resource": "alicloud_oss_bucket.bad_bucket",
+      "annotation": "Public and writeable bucket",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/alicloud/bucket.tf",
+      "resource": "alicloud_oss_bucket.bad_bucket",
+      "annotation": "Versioning isn't enabled",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/alicloud/bucket.tf",
+      "resource": "alicloud_oss_bucket.bad_bucket",
+      "annotation": "Not encrypted with a CMK and no server-side encryption",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/alicloud/bucket.tf",
+      "resource": "alicloud_oss_bucket.bad_bucket",
+      "annotation": "Doesn't have access logging enabled",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/alicloud/rds.tf",
+      "resource": "alicloud_db_instance.seeme",
+      "annotation": "Is public due to Security IPS 0.0.0.0/0",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/alicloud/trail.tf",
+      "resource": "alicloud_actiontrail_trail.fail",
+      "annotation": "Action Trail not logging for all regions",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/alicloud/trail.tf",
+      "resource": "alicloud_actiontrail_trail.fail",
+      "annotation": "Action Trail not logging for all events",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/azure/application_gateway.tf",
+      "resource": "azurerm_application_gateway.network",
+      "annotation": "Missing WAF block",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/oracle/bucket.tf",
+      "resource": "oci_objectstorage_bucket.secretsquirrel",
+      "annotation": "bucket can't emit object events",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/oracle/bucket.tf",
+      "resource": "oci_objectstorage_bucket.secretsquirrel",
+      "annotation": "Storage hasn't versioning enabled",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/oracle/bucket.tf",
+      "resource": "oci_objectstorage_bucket.secretsquirrel",
+      "annotation": "Storage isn't encrypted with Customer Managed Key",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    },
+    {
+      "file": "terraform/oracle/bucket.tf",
+      "resource": "oci_objectstorage_bucket.secretsquirrel",
+      "annotation": "Object Storage is Public",
+      "accept": [],
+      "coverage": "out",
+      "detected": false,
+      "by": []
+    }
+  ],
+  "total_findings": 65,
+  "chains": [
+    "Internet-reachable aws_instance.db_app carries plaintext credentials",
+    "Internet-reachable aws_instance.web_host carries plaintext credentials",
+    "SSRF on internet-facing aws_instance.db_app could steal its role credentials",
+    "SSRF on internet-facing aws_instance.web_host could steal its role credentials",
+    "Publicly reachable data store aws_db_instance.default lacks protection or audit trail"
+  ],
+  "aws_findings_not_in_annotations": [
+    {
+      "id": "F-ea319cad",
+      "rule": "TF-AWS-DB-PUBLIC",
+      "resource": "aws_db_instance.default",
+      "file": "terraform/aws/db-app.tf",
+      "line": 22,
+      "title": "Database is publicly accessible"
+    },
+    {
+      "id": "F-16cfb42e",
+      "rule": "TF-PROVIDER-CREDENTIAL",
+      "resource": "provider.aws",
+      "file": "terraform/aws/providers.tf",
+      "line": 10,
+      "title": "Provider credential 'access_key' hard-coded"
+    },
+    {
+      "id": "F-6975f426",
+      "rule": "TF-PROVIDER-CREDENTIAL",
+      "resource": "provider.aws",
+      "file": "terraform/aws/providers.tf",
+      "line": 11,
+      "title": "Provider credential 'secret_key' hard-coded"
+    },
+    {
+      "id": "F-43b8bb9b",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_db_instance.default",
+      "file": "terraform/aws/db-app.tf",
+      "line": 1,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-bfc7aa80",
+      "rule": "TF-AWS-EKS-PUBLIC-ENDPOINT",
+      "resource": "aws_eks_cluster.eks_cluster",
+      "file": "terraform/aws/eks.tf",
+      "line": 122,
+      "title": "EKS API endpoint is open to the internet"
+    },
+    {
+      "id": "F-4a0153f2",
+      "rule": "TF-AWS-EC2-IMDSV1",
+      "resource": "aws_instance.db_app",
+      "file": "terraform/aws/db-app.tf",
+      "line": 243,
+      "title": "Instance metadata service allows IMDSv1"
+    },
+    {
+      "id": "F-64d4c800",
+      "rule": "TF-AWS-EC2-IMDSV1",
+      "resource": "aws_instance.web_host",
+      "file": "terraform/aws/ec2.tf",
+      "line": 1,
+      "title": "Instance metadata service allows IMDSv1"
+    },
+    {
+      "id": "F-2622ff92",
+      "rule": "TF-AWS-ES-UNENCRYPTED",
+      "resource": "aws_elasticsearch_domain.monitoring-framework",
+      "file": "terraform/aws/es.tf",
+      "line": 1,
+      "title": "Search domain is not encrypted at rest"
+    },
+    {
+      "id": "F-6d7c71e7",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_neptune_cluster.default",
+      "file": "terraform/aws/neptune.tf",
+      "line": 1,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-d006bf47",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app1-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 1,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-3093c624",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app2-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 17,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-80efee12",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app3-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 33,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-010eed99",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app4-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 49,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-58616ff0",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app5-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 65,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-04c7fc74",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app6-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 81,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-70287c12",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app7-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 97,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-fdcfc19c",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app8-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 113,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-ae1672f4",
+      "rule": "TF-AWS-DB-UNENCRYPTED",
+      "resource": "aws_rds_cluster.app9-rds-cluster",
+      "file": "terraform/aws/rds.tf",
+      "line": 130,
+      "title": "Database storage is not encrypted"
+    },
+    {
+      "id": "F-16457da3",
+      "rule": "DF-RUNS-AS-ROOT",
+      "resource": "terraform/aws/resources/Dockerfile",
+      "file": "terraform/aws/resources/Dockerfile",
+      "line": 1,
+      "title": "Final image runs as root"
+    },
+    {
+      "id": "F-324c851e",
+      "rule": "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK",
+      "resource": "aws_s3_bucket.flowbucket",
+      "file": "terraform/aws/ec2.tf",
+      "line": 271,
+      "title": "S3 bucket has no public access block"
+    },
+    {
+      "id": "F-6c82c389",
+      "rule": "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK",
+      "resource": "aws_s3_bucket.financials",
+      "file": "terraform/aws/s3.tf",
+      "line": 42,
+      "title": "S3 bucket has no public access block"
+    },
+    {
+      "id": "F-ab603bda",
+      "rule": "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK",
+      "resource": "aws_s3_bucket.operations",
+      "file": "terraform/aws/s3.tf",
+      "line": 65,
+      "title": "S3 bucket has no public access block"
+    },
+    {
+      "id": "F-0a0e5a65",
+      "rule": "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK",
+      "resource": "aws_s3_bucket.data_science",
+      "file": "terraform/aws/s3.tf",
+      "line": 89,
+      "title": "S3 bucket has no public access block"
+    },
+    {
+      "id": "F-31b63842",
+      "rule": "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK",
+      "resource": "aws_s3_bucket.logs",
+      "file": "terraform/aws/s3.tf",
+      "line": 113,
+      "title": "S3 bucket has no public access block"
+    },
+    {
+      "id": "F-5e98c2c6",
+      "rule": "TF-AWS-ELB-NO-LOGS",
+      "resource": "aws_elb.weblb",
+      "file": "terraform/aws/elb.tf",
+      "line": 2,
+      "title": "Load balancer has no access logs"
+    },
+    {
+      "id": "F-75397582",
+      "rule": "TF-AWS-S3-NO-ENCRYPTION",
+      "resource": "aws_s3_bucket.flowbucket",
+      "file": "terraform/aws/ec2.tf",
+      "line": 271,
+      "title": "S3 bucket does not declare server-side encryption"
+    },
+    {
+      "id": "F-573dbbe1",
+      "rule": "TF-AWS-S3-NO-LOGGING",
+      "resource": "aws_s3_bucket.flowbucket",
+      "file": "terraform/aws/ec2.tf",
+      "line": 271,
+      "title": "S3 bucket has no access logging"
+    },
+    {
+      "id": "F-91a6f39c",
+      "rule": "TF-AWS-S3-NO-VERSIONING",
+      "resource": "aws_s3_bucket.flowbucket",
+      "file": "terraform/aws/ec2.tf",
+      "line": 271,
+      "title": "S3 bucket versioning is off"
+    },
+    {
+      "id": "F-22be91ba",
+      "rule": "TF-AWS-ECR-NO-SCAN",
+      "resource": "aws_ecr_repository.repository",
+      "file": "terraform/aws/ecr.tf",
+      "line": 1,
+      "title": "ECR images are not scanned on push"
+    },
+    {
+      "id": "F-a2df6af7",
+      "rule": "TF-AWS-IAM-ACCESS-KEY",
+      "resource": "aws_iam_access_key.user",
+      "file": "terraform/aws/iam.tf",
+      "line": 21,
+      "title": "Long-lived IAM user access key is created"
+    },
+    {
+      "id": "F-15db10b7",
+      "rule": "TF-AWS-S3-NO-LOGGING",
+      "resource": "aws_s3_bucket.logs",
+      "file": "terraform/aws/s3.tf",
+      "line": 113,
+      "title": "S3 bucket has no access logging"
+    }
+  ],
+  "aws_unannotated_by_rule": {
+    "TF-AWS-DB-PUBLIC": 1,
+    "TF-PROVIDER-CREDENTIAL": 2,
+    "TF-AWS-DB-UNENCRYPTED": 11,
+    "TF-AWS-EKS-PUBLIC-ENDPOINT": 1,
+    "TF-AWS-EC2-IMDSV1": 2,
+    "TF-AWS-ES-UNENCRYPTED": 1,
+    "DF-RUNS-AS-ROOT": 1,
+    "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK": 5,
+    "TF-AWS-ELB-NO-LOGS": 1,
+    "TF-AWS-S3-NO-ENCRYPTION": 1,
+    "TF-AWS-S3-NO-LOGGING": 2,
+    "TF-AWS-S3-NO-VERSIONING": 1,
+    "TF-AWS-ECR-NO-SCAN": 1,
+    "TF-AWS-IAM-ACCESS-KEY": 1
+  },
+  "proposed_actions": 14,
+  "wall_s": 2.12,
+  "files": 72
+}

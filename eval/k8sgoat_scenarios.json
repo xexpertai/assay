@@ -1,0 +1,12 @@
+{
+  "source": "madhuakula/kubernetes-goat (MIT), commit 723a0db478f050d173d23b4ce5044b65bce0bdd0, folders scenarios/ and infrastructure/ only",
+  "method": "Scenarios are the intentionally vulnerable setups named in Kubernetes Goat's public scenario list. Only scenarios whose weakness is visible in a static manifest or Dockerfile are included; runtime-only scenarios (e.g. SSRF in the app, NodePort discovery, crypto-miner analysis, tool demos such as Falco or Popeye) and Helm templates are excluded. The mapping to Assay rule IDs was written by the builder (AI-assisted) and is not an independent label set.",
+  "scenarios": [
+    {"name": "DIND (docker-in-docker) exploitation", "file": "scenarios/health-check/deployment.yaml", "accept": ["K8S-HOSTPATH"]},
+    {"name": "Container escape to the host system", "file": "scenarios/system-monitor/deployment.yaml", "accept": ["K8S-PRIVILEGED", "K8S-HOSTPATH"]},
+    {"name": "DoS the memory/CPU resources", "file": "scenarios/hunger-check/deployment.yaml", "accept": ["K8S-NO-LIMITS"]},
+    {"name": "RBAC least-privileges misconfiguration", "file": "scenarios/insecure-rbac/setup.yaml", "accept": ["K8S-CLUSTER-ADMIN-BINDING", "K8S-RBAC-WILDCARD"]},
+    {"name": "Hidden in layers", "file": "infrastructure/hidden-in-layers/Dockerfile", "accept": ["DF-SECRET-FILE-IN-LAYER"]},
+    {"name": "Helm v2 tiller to cluster takeover (pwnchart ClusterRole)", "file": "infrastructure/helm-tiller/pwnchart/templates/clusterrole.yaml", "accept": ["K8S-RBAC-WILDCARD"]}
+  ]
+}

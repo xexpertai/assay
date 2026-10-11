@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backup
+              image: registry.example.com/backup:2.0.1
+              env:
+                - name: DB_PASSWORD
+                  value: "bK8#rTq2Lm9zVx4"
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add: ["SYS_ADMIN"]
+              resources:
+                limits: {cpu: "1", memory: "512Mi"}

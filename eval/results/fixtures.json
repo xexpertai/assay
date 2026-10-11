@@ -1,0 +1,519 @@
+{
+  "cases": [
+    {
+      "case": "compose_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "compose_sock",
+      "safe_case": false,
+      "expected": [
+        "COMPOSE-DOCKER-SOCK",
+        "COMPOSE-HOST-NETWORK",
+        "COMPOSE-PRIVILEGED"
+      ],
+      "got": [
+        "COMPOSE-DOCKER-SOCK",
+        "COMPOSE-HOST-NETWORK",
+        "COMPOSE-PRIVILEGED"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "deps_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "deps_unpinned",
+      "safe_case": false,
+      "expected": [
+        "DEP-INSECURE-INDEX",
+        "DEP-UNPINNED"
+      ],
+      "got": [
+        "DEP-INSECURE-INDEX",
+        "DEP-UNPINNED"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "df_root_latest",
+      "safe_case": false,
+      "expected": [
+        "DF-BASE-UNPINNED",
+        "DF-RUNS-AS-ROOT"
+      ],
+      "got": [
+        "DF-BASE-UNPINNED",
+        "DF-RUNS-AS-ROOT"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "df_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "df_secret_layer",
+      "safe_case": false,
+      "expected": [
+        "DF-SECRET-FILE-IN-LAYER"
+      ],
+      "got": [
+        "DF-SECRET-FILE-IN-LAYER"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "df_supply",
+      "safe_case": false,
+      "expected": [
+        "DF-ADD-REMOTE",
+        "DF-CURL-PIPE-SHELL",
+        "DF-EXPOSE-SSH",
+        "DF-SECRET-IN-IMAGE"
+      ],
+      "got": [
+        "DF-ADD-REMOTE",
+        "DF-CURL-PIPE-SHELL",
+        "DF-EXPOSE-SSH",
+        "DF-SECRET-IN-IMAGE"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "gha_injection",
+      "safe_case": false,
+      "expected": [
+        "GHA-SCRIPT-INJECTION",
+        "GHA-UNPINNED-ACTION",
+        "GHA-WRITE-ALL"
+      ],
+      "got": [
+        "GHA-SCRIPT-INJECTION",
+        "GHA-UNPINNED-ACTION",
+        "GHA-WRITE-ALL"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "gha_prt",
+      "safe_case": false,
+      "expected": [
+        "GHA-PRT-CHECKOUT"
+      ],
+      "got": [
+        "GHA-PRT-CHECKOUT"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "gha_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_caps_env",
+      "safe_case": false,
+      "expected": [
+        "K8S-DANGEROUS-CAPS",
+        "K8S-ENV-SECRET"
+      ],
+      "got": [
+        "K8S-DANGEROUS-CAPS",
+        "K8S-ENV-SECRET"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_docker_sock",
+      "safe_case": false,
+      "expected": [
+        "K8S-HARDENING-MISSING",
+        "K8S-HOST-NAMESPACE",
+        "K8S-HOSTPATH",
+        "K8S-IMAGE-UNPINNED",
+        "K8S-NO-LIMITS"
+      ],
+      "got": [
+        "K8S-HARDENING-MISSING",
+        "K8S-HOST-NAMESPACE",
+        "K8S-HOSTPATH",
+        "K8S-IMAGE-UNPINNED",
+        "K8S-NO-LIMITS"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_privileged",
+      "safe_case": false,
+      "expected": [
+        "K8S-PRIVILEGED"
+      ],
+      "got": [
+        "K8S-PRIVILEGED"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_rbac",
+      "safe_case": false,
+      "expected": [
+        "K8S-CLUSTER-ADMIN-BINDING",
+        "K8S-RBAC-SECRETS",
+        "K8S-RBAC-WILDCARD"
+      ],
+      "got": [
+        "K8S-CLUSTER-ADMIN-BINDING",
+        "K8S-RBAC-SECRETS",
+        "K8S-RBAC-WILDCARD"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "secret_in_config",
+      "safe_case": false,
+      "expected": [
+        "SECRET-HARDCODED"
+      ],
+      "got": [
+        "SECRET-HARDCODED"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "secret_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_ebs_kms",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED",
+        "TF-AWS-EBS-UNENCRYPTED",
+        "TF-AWS-KMS-NO-ROTATION"
+      ],
+      "got": [
+        "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED",
+        "TF-AWS-EBS-UNENCRYPTED",
+        "TF-AWS-KMS-NO-ROTATION"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_ebs_kms_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_ec2_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_ec2_userdata_secret",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-EC2-IMDSV1",
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ],
+      "got": [
+        "TF-AWS-EC2-IMDSV1",
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_ec2_userdata_var",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ],
+      "got": [
+        "TF-AWS-EC2-USERDATA-SECRET"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_eks_public",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-EKS-PUBLIC-ENDPOINT"
+      ],
+      "got": [
+        "TF-AWS-EKS-PUBLIC-ENDPOINT"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_eks_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_gcp_open",
+      "safe_case": false,
+      "expected": [
+        "TF-GCP-FIREWALL-OPEN",
+        "TF-GCP-GCS-PUBLIC"
+      ],
+      "got": [
+        "TF-GCP-FIREWALL-OPEN",
+        "TF-GCP-GCS-PUBLIC"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_iam_scoped",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_iam_wildcard",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-IAM-WILDCARD"
+      ],
+      "got": [
+        "TF-AWS-IAM-WILDCARD"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_lambda_env_secret",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-LAMBDA-ENV-SECRET"
+      ],
+      "got": [
+        "TF-AWS-LAMBDA-ENV-SECRET"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_lambda_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_provider_creds",
+      "safe_case": false,
+      "expected": [
+        "TF-PROVIDER-CREDENTIAL"
+      ],
+      "got": [
+        "TF-PROVIDER-CREDENTIAL"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_rds_public",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-DB-PLAINTEXT-PASSWORD",
+        "TF-AWS-DB-PUBLIC",
+        "TF-AWS-DB-UNENCRYPTED"
+      ],
+      "got": [
+        "TF-AWS-DB-PLAINTEXT-PASSWORD",
+        "TF-AWS-DB-PUBLIC",
+        "TF-AWS-DB-UNENCRYPTED"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_rds_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_s3_public",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-S3-NO-ENCRYPTION",
+        "TF-AWS-S3-NO-LOGGING",
+        "TF-AWS-S3-NO-VERSIONING",
+        "TF-AWS-S3-PUBLIC-ACL"
+      ],
+      "got": [
+        "TF-AWS-S3-NO-ENCRYPTION",
+        "TF-AWS-S3-NO-LOGGING",
+        "TF-AWS-S3-NO-VERSIONING",
+        "TF-AWS-S3-PUBLIC-ACL"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_s3_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_all_ports",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "got": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_rule_db_open",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-SG-OPEN-DATA"
+      ],
+      "got": [
+        "TF-AWS-SG-OPEN-DATA"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_safe",
+      "safe_case": true,
+      "expected": [
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "got": [
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_ssh_open",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "got": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    }
+  ],
+  "n_cases": 39,
+  "passed": 39,
+  "rule_hits_tp": 51,
+  "rule_hits_fp": 0,
+  "rule_hits_fn": 0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "safe_cases": 14,
+  "safe_cases_clean": 14,
+  "errors": {}
+}

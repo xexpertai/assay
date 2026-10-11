@@ -1,0 +1,21 @@
+[project]
+name = "assay"
+version = "0.1.0"
+description = "Assay: an explainable, approval-gated security assessment agent for infrastructure-as-code, containers, CI and secrets"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6.0"]
+
+[project.scripts]
+assay = "assay.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
