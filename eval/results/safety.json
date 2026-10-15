@@ -49,10 +49,22 @@
       "pass": true
     },
     {
+      "check": "re-written audit chain without the run key is detected (HMAC)",
+      "pass": true
+    },
+    {
+      "check": "run key is stored outside the run directory",
+      "pass": true
+    },
+    {
+      "check": "approval without a named person is refused",
+      "pass": true
+    },
+    {
       "check": "full secret never written to any output",
       "pass": true
     }
   ],
-  "passed": 13,
-  "total": 13
+  "passed": 16,
+  "total": 16
 }

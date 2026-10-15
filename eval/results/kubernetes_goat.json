@@ -72,12 +72,13 @@
       ]
     }
   ],
-  "total_findings": 110,
+  "total_findings": 112,
   "by_rule": {
     "K8S-PRIVILEGED": 6,
     "K8S-HOSTPATH": 41,
     "K8S-HOST-NAMESPACE": 4,
     "K8S-RBAC-WILDCARD": 1,
+    "SECRET-HARDCODED": 2,
     "K8S-CLUSTER-ADMIN-BINDING": 1,
     "DF-SECRET-FILE-IN-LAYER": 1,
     "DF-SECRET-IN-IMAGE": 1,
@@ -89,12 +90,12 @@
   },
   "chains": [
     "DaemonSet/docker-bench-security combines several container-escape weaknesses",
-    "Deployment/health-check-deployment-simple combines several container-escape weaknesses",
     "Deployment/health-check-deployment combines several container-escape weaknesses",
-    "Job/kube-bench-master combines several container-escape weaknesses",
+    "Deployment/health-check-deployment-simple combines several container-escape weaknesses",
+    "Deployment/system-monitor-deployment combines several container-escape weaknesses",
     "Job/kube-bench-node combines several container-escape weaknesses",
-    "Deployment/system-monitor-deployment combines several container-escape weaknesses"
+    "Job/kube-bench-master combines several container-escape weaknesses"
   ],
-  "wall_s": 0.97,
+  "wall_s": 0.41,
   "files": 122
 }

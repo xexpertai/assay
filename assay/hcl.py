@@ -203,7 +203,7 @@ def is_false(value: str | None) -> bool:
     return value is not None and unquote(value).lower() == "false"
 
 
-REF_RE = re.compile(r"\b((?:data\.)?[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_\-]*)\.(?:id|arn|name|bucket)\b")
+REF_RE = re.compile(r"\b((?:data\.)?[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_\-]*)(?:\[[^\]]*\])?\.(?:id|arn|name|bucket|json)\b")
 
 
 def references(block: Block) -> set[str]:

@@ -13,4 +13,8 @@ if [ ! -d samples/kubernetes-goat ]; then
   git -C samples/kubernetes-goat sparse-checkout set scenarios infrastructure
   git -C samples/kubernetes-goat checkout -q 723a0db478f050d173d23b4ce5044b65bce0bdd0
 fi
+if [ ! -d samples/sadcloud ]; then
+  git clone -q https://github.com/nccgroup/sadcloud.git samples/sadcloud   # Apache-2.0 (blind sample)
+  git -C samples/sadcloud checkout -q f538652921a7f3e8e25c0afaecad2d4382f8b21e
+fi
 echo "samples ready: $(ls samples)"

@@ -12,7 +12,8 @@ from ..models import Finding
 from .secrets import is_placeholder, redact, scan_text, secret_tag
 
 WORLD = ('"0.0.0.0/0"', '"::/0"')
-ADMIN_PORTS = {22: "SSH", 3389: "RDP"}
+ADMIN_PORTS = {22: "SSH", 23: "Telnet", 3389: "RDP", 5900: "VNC", 5985: "WinRM", 5986: "WinRM"}
+PLAINTEXT_PORTS = {21: "FTP", 69: "TFTP", 110: "POP3", 143: "IMAP", 161: "SNMP", 445: "SMB", 2375: "Docker API"}
 DATA_PORTS = {3306: "MySQL", 5432: "PostgreSQL", 1433: "SQL Server", 27017: "MongoDB", 6379: "Redis",
               9200: "Elasticsearch", 5601: "Kibana", 11211: "Memcached"}
 INTERP_SECRET_RE = re.compile(
@@ -27,9 +28,25 @@ def _f(block: Block, rel: str, **kw) -> Finding:
     return Finding(file=rel, **kw)
 
 
-def _set_fix(block: Block, rel: str, attr: str, value: str) -> dict:
-    return {"type": "tf_set_attr", "file": rel, "address": block.address, "block_line": block.line,
-            "attr": attr, "value": value}
+def _set_fix(block: Block, rel: str, attr: str, value: str, attrs: dict | None = None) -> dict:
+    fix = {"type": "tf_set_attr", "file": rel, "address": block.address, "block_line": block.line,
+           "attr": attr, "value": value}
+    if attrs and len(attrs) > 1:
+        fix["attrs"] = attrs  # several attributes set in one approved action
+    return fix
+
+
+def _unsure(block: Block, attr: str) -> tuple[str, str] | None:
+    """(confidence, evidence) when `attr` is a non-literal expression, else None (literal or absent)."""
+    v = block.get(attr)
+    if v is None or _literal(v):
+        return None
+    return "medium", f"{attr} = {' '.join(v.split())} (expression; the resolved value is not known)"
+
+
+def _dyn(block: Block, name: str) -> bool:
+    """A `dynamic "name" { ... }` block: the nested block may or may not be rendered."""
+    return any(b.type == "dynamic" and b.labels == [name] for b in block.blocks)
 
 
 def _int(v: str | None) -> int | None:
@@ -41,7 +58,7 @@ def _int(v: str | None) -> int | None:
 
 def _port_range(rule: Block) -> tuple[int, int] | None:
     lo, hi = _int(rule.get("from_port")), _int(rule.get("to_port"))
-    proto = (unquote(rule.get("protocol")) or "").lower()
+    proto = (unquote(rule.get("protocol") or rule.get("ip_protocol")) or "").lower()
     if proto in ("-1", "all"):
         return (0, 65535)
     if lo is None or hi is None:
@@ -51,12 +68,38 @@ def _port_range(rule: Block) -> tuple[int, int] | None:
     return (lo, hi)
 
 
+CIDR_ATTRS = ("cidr_blocks", "ipv6_cidr_blocks", "cidr_ipv4", "cidr_ipv6")
+LITERAL_RE = re.compile(r'^(?:"[^"$]*"|true|false|-?\d+|\[\s*(?:"[^"$]*"\s*,?\s*)*\])$')
+
+
+def _cidr_text(rule: Block) -> str:
+    return " ".join(rule.get(a) or "" for a in CIDR_ATTRS)
+
+
 def _world_open(rule: Block) -> bool:
-    text = (rule.get("cidr_blocks") or "") + (rule.get("ipv6_cidr_blocks") or "")
-    return any(w in text for w in WORLD)
+    return any(w in _cidr_text(rule) for w in WORLD)
 
 
-def _check_ingress(owner: Block, rule: Block, rel: str) -> list[Finding]:
+def _literal(value: str | None) -> bool:
+    """True when the expression is a plain string or list literal (no variables, conditionals, loops)."""
+    return value is None or LITERAL_RE.match(value.strip()) is not None
+
+
+def _cidrs(rule: Block) -> str:
+    """Human-readable source list: 0.0.0.0/0, ::/0 (not the raw HCL fragment)."""
+    found = re.findall(r'"([^"]*)"', _cidr_text(rule))
+    return ", ".join(found) or _cidr_text(rule).strip()
+
+
+def _sg_owner(rule: Block, every: list[Block]) -> str:
+    """The security group a standalone rule belongs to, so exposure attaches to the group."""
+    for r in references(rule):
+        if r.startswith("aws_security_group."):
+            return r
+    return rule.address
+
+
+def _check_ingress(owner: Block, rule: Block, rel: str, resource: str | None = None) -> list[Finding]:
     if not _world_open(rule):
         return []
     pr = _port_range(rule)
@@ -64,30 +107,39 @@ def _check_ingress(owner: Block, rule: Block, rel: str) -> list[Finding]:
         return []
     lo, hi = pr
     out: list[Finding] = []
-    exposed = {**ADMIN_PORTS, **DATA_PORTS}
+    literal = all(_literal(rule.get(a)) for a in CIDR_ATTRS)
+    conf = "high" if literal else "medium"
+    res = resource or owner.address
+    exposed = {**ADMIN_PORTS, **DATA_PORTS, **PLAINTEXT_PORTS}
     hit = {p: n for p, n in exposed.items() if lo <= p <= hi}
     if hit:
         names = ", ".join(f"{n} ({p})" for p, n in sorted(hit.items()))
         admin = any(p in ADMIN_PORTS for p in hit)
-        out.append(_f(owner, rel, line=rule.line,
-                      rule_id="TF-AWS-SG-OPEN-ADMIN" if admin else "TF-AWS-SG-OPEN-DATA",
+        data = any(p in DATA_PORTS for p in hit)
+        rule_id = "TF-AWS-SG-OPEN-ADMIN" if admin else "TF-AWS-SG-OPEN-DATA" if data else "TF-AWS-SG-OPEN-PLAINTEXT"
+        out.append(_f(owner, rel, line=rule.line, resource=res, rule_id=rule_id,
                       title=f"Security group allows the whole internet to reach {names}",
-                      severity="high", confidence="high",
-                      evidence=f"ingress {lo}-{hi} from " + " ".join((rule.get('cidr_blocks') or rule.get('ipv6_cidr_blocks') or "").split()),
+                      severity="high" if admin or data else "medium", confidence=conf,
+                      evidence=f"ingress {lo}-{hi} from {_cidrs(rule)}"
+                               + ("" if literal else " (expression, not a literal: confirm the resolved value)"),
                       rationale="Remote-administration and database ports open to 0.0.0.0/0 are scanned and "
-                                "brute-forced within minutes of exposure.",
+                                "brute-forced within minutes of exposure." if admin or data else
+                                "Plain-text protocols open to the internet expose credentials in transit and are "
+                                "scanned constantly.",
                       remediation="Restrict the source CIDR to a VPN or bastion range, or use SSM Session Manager "
                                   "instead of opening SSH/RDP.",
-                      cwe="CWE-284", category="sg_open_admin", tags=["internet-exposed", "network"]))
+                      cwe="CWE-284", category="sg_open_admin", tags=["internet-exposed", "network"],
+                      meta={"ports": [lo, hi]}))
     else:
-        out.append(_f(owner, rel, line=rule.line, rule_id="TF-AWS-SG-INTERNET-FACING",
+        out.append(_f(owner, rel, line=rule.line, resource=res, rule_id="TF-AWS-SG-INTERNET-FACING",
                       title=f"Resource is internet-facing on port {lo}" + (f"-{hi}" if hi != lo else ""),
-                      severity="info", confidence="high",
-                      evidence=f"ingress {lo}-{hi} from 0.0.0.0/0",
+                      severity="info", confidence=conf,
+                      evidence=f"ingress {lo}-{hi} from {_cidrs(rule)}",
                       rationale="Not a vulnerability on its own, but anything attached to this group is reachable "
                                 "from the internet, which raises the priority of its other findings.",
                       remediation="Confirm that public exposure is intended (for example a web front end).",
-                      cwe="", category="internet_facing", tags=["internet-exposed", "network"]))
+                      cwe="", category="internet_facing", tags=["internet-exposed", "network"],
+                      meta={"ports": [lo, hi]}))
     return out
 
 
@@ -154,6 +206,98 @@ def _has_companion(all_blocks: list[Block], rtype: str, target: Block) -> bool:
     return False
 
 
+PAB_FLAGS = ("block_public_acls", "block_public_policy", "ignore_public_acls", "restrict_public_buckets")
+
+
+def _bucket_of(b: Block) -> str:
+    """Address of the aws_s3_bucket a companion resource configures (falls back to the companion itself)."""
+    for r in references(b):
+        if r.startswith("aws_s3_bucket."):
+            return r
+    return b.address
+
+
+def _public_acl_companion(every: list[Block], bucket: Block) -> bool:
+    return any(x.type == "resource" and x.labels and x.labels[0] == "aws_s3_bucket_acl"
+               and bucket.address in references(x)
+               and (unquote(x.get("acl")) or "") in ("public-read", "public-read-write", "authenticated-read")
+               for x in every)
+
+
+def _versioning_companion_on(every: list[Block], bucket: Block) -> bool:
+    for x in every:
+        if x.type == "resource" and x.labels and x.labels[0] == "aws_s3_bucket_versioning" \
+                and bucket.address in references(x):
+            for vc in x.children("versioning_configuration"):
+                if unquote(vc.get("status")) == "Enabled":
+                    return True
+    return False
+
+
+def _statements(text: str) -> list[str]:
+    """Split a policy (JSON, jsonencode() or heredoc) into its Statement objects, whitespace removed."""
+    t = re.sub(r"\s+", "", text)
+    m = re.search(r'"?Statement"?[:=]\[', t)
+    if not m:
+        return [t]
+    out, depth, start = [], 0, None
+    for i in range(m.end(), len(t)):
+        c = t[i]
+        if c == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                out.append(t[start:i + 1])
+                start = None
+        elif c == "]" and depth == 0:
+            break
+    return out or [t]
+
+
+PRINCIPAL_ANY_RE = re.compile(r'"?Principal"?[:=](?:"\*"|\{"?AWS"?[:=](?:"\*"|\["\*"\])\})')
+
+
+def _principal_any(text: str, every: list[Block] | None = None) -> bool:
+    """True if some Allow statement names Principal "*" (or {"AWS": "*"}); follows data.aws_iam_policy_document."""
+    for st in _statements(text):
+        if re.search(r'"?Effect"?[:=]"Allow"', st) and PRINCIPAL_ANY_RE.search(st):
+            return True
+    return bool(every) and any(_doc_allows_any(d) for d in _policy_docs(text, every))
+
+
+def _policy_docs(text: str, every: list[Block]) -> list[Block]:
+    """The data.aws_iam_policy_document blocks a policy expression refers to (indexed refs allowed)."""
+    names = set(re.findall(r"data\.aws_iam_policy_document\.([A-Za-z_][A-Za-z0-9_\-]*)", text))
+    return [b for b in every if b.type == "data" and b.labels[:1] == ["aws_iam_policy_document"]
+            and len(b.labels) == 2 and b.labels[1] in names]
+
+
+def _doc_allows_any(doc: Block) -> bool:
+    for st in doc.children("statement"):
+        if unquote(st.get("effect") or '"Allow"') != "Allow":
+            continue
+        for pr in st.children("principals"):
+            ids = pr.get("identifiers") or ""
+            if unquote(pr.get("type")) in ("AWS", "*") and '"*"' in ids:
+                return True
+    return False
+
+
+def _principal_any_conditioned(text: str, every: list[Block] | None = None) -> bool:
+    """True if every wildcard-principal Allow statement carries a Condition (which may narrow it)."""
+    hits = [st for st in _statements(text) if re.search(r'"?Effect"?[:=]"Allow"', st) and PRINCIPAL_ANY_RE.search(st)]
+    for d in _policy_docs(text, every or []):
+        for st in d.children("statement"):
+            if unquote(st.get("effect") or '"Allow"') == "Allow" and any(
+                    unquote(p.get("type")) in ("AWS", "*") and '"*"' in (p.get("identifiers") or "")
+                    for p in st.children("principals")):
+                hits.append("Condition" if st.children("condition") else "")
+    return bool(hits) and all("Condition" in st for st in hits)
+
+
 def _iam_wildcard(text: str) -> bool:
     t = re.sub(r"\s+", "", text)
     action_star = re.search(r'"?[Aa]ctions?"?[:=]\[?"\*"', t) is not None
@@ -193,6 +337,17 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
                               cwe="CWE-284", category="s3_public", tags=["internet-exposed", "data-store"],
                               fix={"type": "tf_set_attr", "file": rel, "address": b.address, "block_line": b.line,
                                    "attr": "acl", "value": '"private"'}))
+            elif b.get("acl") and not _literal(b.get("acl")):
+                out.append(_f(b, rel, line=b.attrs["acl"].line, rule_id="TF-AWS-UNRESOLVED-EXPOSURE",
+                              title="S3 bucket ACL comes from a variable", severity="low", confidence="low",
+                              evidence=f"acl = {b.get('acl')}",
+                              rationale="Assay does not resolve variables, so it cannot tell whether this bucket is "
+                                        "public. The value decides the bucket's exposure.",
+                              remediation="Use a literal acl = \"private\" plus a public access block, or confirm the "
+                                          "variable's value in every workspace.",
+                              cwe="CWE-284", category="unresolved", tags=["data-store"]))
+            elif not acl and _public_acl_companion(every, b):
+                pass  # reported on the aws_s3_bucket_acl resource below
             elif not _has_companion(every, "aws_s3_bucket_public_access_block", b):
                 out.append(_f(b, rel, rule_id="TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK",
                               title="S3 bucket has no public access block", severity="medium", confidence="medium",
@@ -203,35 +358,100 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
                               cwe="CWE-284", category="s3_public", tags=["data-store"]))
             if not b.children("server_side_encryption_configuration") and \
                     not _has_companion(every, "aws_s3_bucket_server_side_encryption_configuration", b):
+                dyn = _dyn(b, "server_side_encryption_configuration")
                 out.append(_f(b, rel, rule_id="TF-AWS-S3-NO-ENCRYPTION",
                               title="S3 bucket does not declare server-side encryption", severity="low",
-                              confidence="high", evidence="no server_side_encryption_configuration",
+                              confidence="medium" if dyn else "high",
+                              evidence="dynamic server_side_encryption_configuration block (may render empty)" if dyn
+                              else "no server_side_encryption_configuration",
                               rationale="AWS now applies SSE-S3 by default to new objects, but declaring SSE-KMS "
                                         "makes encryption explicit, auditable and key-controlled.",
                               remediation="Add a server-side encryption configuration using a customer-managed KMS key.",
                               cwe="CWE-311", category="s3_encryption", tags=["data-store"]))
             if not b.children("logging") and not _has_companion(every, "aws_s3_bucket_logging", b):
+                dyn = _dyn(b, "logging")
                 out.append(_f(b, rel, rule_id="TF-AWS-S3-NO-LOGGING", title="S3 bucket has no access logging",
-                              severity="low", confidence="high", evidence="no logging block",
+                              severity="low", confidence="medium" if dyn else "high",
+                              evidence="dynamic logging block (may render empty)" if dyn else "no logging block",
                               rationale="Without access logs there is no record of who read or changed the data, "
                                         "which blocks incident investigation.",
                               remediation="Enable server access logging to a separate log bucket.",
                               cwe="CWE-778", category="s3_logging", tags=["data-store"]))
             ver = b.children("versioning")
-            ver_on = any(is_true(v.get("enabled")) for v in ver)
-            if not ver_on and not _has_companion(every, "aws_s3_bucket_versioning", b):
+            ver_on = any(is_true(v.get("enabled")) for v in ver) or _versioning_companion_on(every, b)
+            if not ver_on:
+                unsure = next((_unsure(v, "enabled") for v in ver if _unsure(v, "enabled")), None)
                 out.append(_f(b, rel, rule_id="TF-AWS-S3-NO-VERSIONING", title="S3 bucket versioning is off",
-                              severity="low", confidence="high", evidence="no versioning { enabled = true }",
+                              severity="low", confidence=unsure[0] if unsure else "high",
+                              evidence=unsure[1] if unsure else "no versioning { enabled = true }",
                               rationale="Without versioning, deleted or ransomware-overwritten objects cannot be "
                                         "recovered.",
                               remediation="Enable versioning (and consider MFA delete for critical buckets).",
                               cwe="CWE-693", category="s3_versioning", tags=["data-store"]))
 
+        elif rtype == "aws_s3_bucket_acl":
+            acl = unquote(b.get("acl")) or ""
+            if acl in ("public-read", "public-read-write", "authenticated-read"):
+                out.append(_f(b, rel, line=b.attrs["acl"].line, resource=_bucket_of(b), rule_id="TF-AWS-S3-PUBLIC-ACL",
+                              title=f"S3 bucket ACL is '{acl}'", severity="high", confidence="high",
+                              evidence=f'aws_s3_bucket_acl {b.labels[1]}: acl = "{acl}"',
+                              rationale="A public ACL lets anyone on the internet list or read (or write) objects.",
+                              remediation='Set acl = "private" and keep the public access block fully enabled.',
+                              cwe="CWE-284", category="s3_public", tags=["internet-exposed", "data-store"],
+                              fix=_set_fix(b, rel, "acl", '"private"')))
+        elif rtype == "aws_s3_bucket_public_access_block":
+            off = [k for k in PAB_FLAGS if is_false(b.get(k))]
+            unknown = [k for k in PAB_FLAGS if b.get(k) is not None and not _literal(b.get(k))]
+            if off:
+                out.append(_f(b, rel, resource=_bucket_of(b), rule_id="TF-AWS-S3-PUBLIC-ACCESS-BLOCK-OFF",
+                              title=f"S3 public access block is disabled ({len(off)} of 4 settings false)",
+                              severity="medium", confidence="high",
+                              evidence=", ".join(f"{k} = false" for k in off),
+                              rationale="With these settings off, a public ACL or bucket policy takes effect "
+                                        "instead of being blocked by the account-level guard rail.",
+                              remediation="Set all four settings to true unless the bucket is a deliberate "
+                                          "public website.", cwe="CWE-284", category="s3_public", tags=["data-store"],
+                              fix=_set_fix(b, rel, off[0], "true", {k: "true" for k in off})))
+            elif unknown:
+                out.append(_f(b, rel, resource=_bucket_of(b), rule_id="TF-AWS-S3-PUBLIC-ACCESS-BLOCK-OFF",
+                              title="S3 public access block settings come from expressions", severity="low",
+                              confidence="low", evidence=", ".join(f"{k} = {b.get(k)}" for k in unknown),
+                              rationale="Assay cannot see the resolved value; confirm it is true in every workspace.",
+                              remediation="Prefer literal true values for the four public-access-block settings.",
+                              cwe="CWE-284", category="s3_public", tags=["data-store"]))
+        elif rtype == "aws_s3_bucket_policy":
+            pol = b.attrs.get("policy")
+            if pol and _principal_any(pol.value, every):
+                cond = _principal_any_conditioned(pol.value, every)
+                out.append(_f(b, rel, line=pol.line, resource=_bucket_of(b), rule_id="TF-AWS-S3-POLICY-PUBLIC",
+                              title="S3 bucket policy grants access to everyone (Principal \"*\")",
+                              severity="high", confidence="medium" if cond else "high",
+                              evidence='Effect "Allow" with Principal "*"' + (" (a Condition narrows it; check it)"
+                                                                            if cond else ""),
+                              rationale="A wildcard principal makes the bucket readable (or writable) by any AWS "
+                                        "account and, for s3:GetObject, by anonymous internet users.",
+                              remediation="Name specific principals, or serve public content through CloudFront "
+                                          "with an origin access control.",
+                              cwe="CWE-284", category="s3_public", tags=["internet-exposed", "data-store"]))
+        elif rtype == "aws_iam_role":
+            pol = b.attrs.get("assume_role_policy")
+            if pol and _principal_any(pol.value, every):
+                out.append(_f(b, rel, line=pol.line, rule_id="TF-AWS-IAM-ROLE-ASSUME-ANY",
+                              title="IAM role can be assumed by anyone (Principal \"*\")", severity="critical",
+                              confidence="medium" if _principal_any_conditioned(pol.value, every) else "high",
+                              evidence='assume_role_policy allows sts:AssumeRole for Principal "*"',
+                              rationale="Any AWS account in the world can assume this role and inherit its "
+                                        "permissions.",
+                              remediation="Restrict the principal to specific accounts, services or an OIDC "
+                                          "provider with a subject condition.",
+                              cwe="CWE-284", category="iam_wildcard", tags=["privilege", "internet-exposed"]))
         elif rtype == "aws_security_group":
             for ing in b.children("ingress"):
                 out += _check_ingress(b, ing, rel)
         elif rtype == "aws_security_group_rule" and (unquote(b.get("type")) == "ingress"):
-            out += _check_ingress(b, b, rel)
+            out += _check_ingress(b, b, rel, resource=_sg_owner(b, every))
+        elif rtype == "aws_vpc_security_group_ingress_rule":
+            out += _check_ingress(b, b, rel, resource=_sg_owner(b, every))
 
         elif rtype in ("aws_instance", "aws_launch_template", "aws_launch_configuration"):
             out += _embedded_secrets(b, "user_data", rel, "TF-AWS-EC2-USERDATA-SECRET", "secret_in_userdata",
@@ -257,8 +477,9 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
             out += _lambda_env(b, rel)
 
         elif rtype == "aws_ebs_volume" and not is_true(b.get("encrypted")):
+            u = _unsure(b, "encrypted")
             out.append(_f(b, rel, rule_id="TF-AWS-EBS-UNENCRYPTED", title="EBS volume is not encrypted",
-                          severity="medium", confidence="high", evidence="encrypted is not true",
+                          severity="medium", confidence=u[0] if u else "high", evidence=u[1] if u else "encrypted is not true",
                           rationale="Unencrypted volumes and every snapshot made from them expose data if a "
                                     "snapshot is shared or copied.",
                           remediation="Set encrypted = true (and kms_key_id), or enable EBS encryption by default.",
@@ -268,21 +489,34 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
             src = [r for r in references(b) if r.startswith("aws_ebs_volume.")]
             src_blocks = [x for x in every if x.address in src]
             if src_blocks and not any(is_true(x.get("encrypted")) for x in src_blocks):
+                u = next((_unsure(x, "encrypted") for x in src_blocks if _unsure(x, "encrypted")), None)
                 out.append(_f(b, rel, rule_id="TF-AWS-EBS-SNAPSHOT-UNENCRYPTED",
                               title="EBS snapshot is taken from an unencrypted volume", severity="medium",
-                              confidence="high", evidence=f"source volume {src[0]} has no encrypted = true",
+                              confidence=u[0] if u else "high",
+                              evidence=f"source volume {src[0]}: " + (u[1] if u else "no encrypted = true"),
                               rationale="Snapshots inherit the volume's encryption; this one stores data in clear.",
                               remediation="Encrypt the source volume or copy the snapshot with encryption enabled.",
                               cwe="CWE-311", category="ebs_snapshot_unencrypted", tags=["data-store"]))
 
         elif rtype == "aws_kms_key" and not is_true(b.get("enable_key_rotation")):
+            u = _unsure(b, "enable_key_rotation")
             out.append(_f(b, rel, rule_id="TF-AWS-KMS-NO-ROTATION", title="KMS key rotation is disabled",
-                          severity="low", confidence="high", evidence="enable_key_rotation is not true",
+                          severity="low", confidence=u[0] if u else "high",
+                          evidence=u[1] if u else "enable_key_rotation is not true",
                           rationale="Automatic rotation limits how much data one compromised key version protects.",
                           remediation="Set enable_key_rotation = true.", cwe="CWE-320",
                           category="kms_rotation", fix=_set_fix(b, rel, "enable_key_rotation", "true")))
 
         elif rtype in ("aws_db_instance", "aws_rds_cluster", "aws_neptune_cluster", "aws_docdb_cluster"):
+            if b.get("publicly_accessible") and not _literal(b.get("publicly_accessible")):
+                out.append(_f(b, rel, line=b.attrs["publicly_accessible"].line, rule_id="TF-AWS-UNRESOLVED-EXPOSURE",
+                              title="Database public exposure depends on a variable", severity="low", confidence="low",
+                              evidence=f"publicly_accessible = {b.get('publicly_accessible')}",
+                              rationale="Assay does not resolve variables, so it cannot tell whether this database "
+                                        "endpoint is public. The value decides the exposure.",
+                              remediation="Prefer a literal publicly_accessible = false, or confirm the variable's "
+                                          "value in every workspace.",
+                              cwe="CWE-284", category="unresolved", tags=["data-store"]))
             if is_true(b.get("publicly_accessible")):
                 out.append(_f(b, rel, line=b.attrs["publicly_accessible"].line, rule_id="TF-AWS-DB-PUBLIC",
                               title="Database is publicly accessible", severity="high", confidence="high",
@@ -293,8 +527,10 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
                               cwe="CWE-284", category="db_public", tags=["internet-exposed", "data-store"],
                               fix=_set_fix(b, rel, "publicly_accessible", "false")))
             if not is_true(b.get("storage_encrypted")):
+                u = _unsure(b, "storage_encrypted")
                 out.append(_f(b, rel, rule_id="TF-AWS-DB-UNENCRYPTED", title="Database storage is not encrypted",
-                              severity="medium", confidence="high", evidence="storage_encrypted is not true",
+                              severity="medium", confidence=u[0] if u else "high",
+                              evidence=u[1] if u else "storage_encrypted is not true",
                               rationale="Unencrypted database storage and its snapshots expose data at rest.",
                               remediation="Set storage_encrypted = true (requires a new instance or restore).",
                               cwe="CWE-311", category="db_unencrypted", tags=["data-store"],
@@ -336,16 +572,20 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
                               remediation="Enable encrypt_at_rest and node_to_node_encryption.", cwe="CWE-311",
                               category="es_unencrypted", tags=["data-store"]))
         elif rtype == "aws_elb" and not b.children("access_logs"):
+            dyn = _dyn(b, "access_logs")
             out.append(_f(b, rel, rule_id="TF-AWS-ELB-NO-LOGS", title="Load balancer has no access logs",
-                          severity="low", confidence="high", evidence="no access_logs block",
+                          severity="low", confidence="medium" if dyn else "high",
+                          evidence="dynamic access_logs block (may render empty)" if dyn else "no access_logs block",
                           rationale="Without access logs, attacks against the public entry point leave no trace.",
                           remediation="Enable access_logs to an S3 bucket.", cwe="CWE-778", category="elb_logging",
                           tags=["internet-exposed"]))
         elif rtype == "aws_ecr_repository":
             scan = b.children("image_scanning_configuration")
             if not any(is_true(s.get("scan_on_push")) for s in scan):
+                u = next((_unsure(x, "scan_on_push") for x in scan if _unsure(x, "scan_on_push")), None)
                 out.append(_f(b, rel, rule_id="TF-AWS-ECR-NO-SCAN", title="ECR images are not scanned on push",
-                              severity="low", confidence="high", evidence="scan_on_push is not true",
+                              severity="low", confidence=u[0] if u else "high",
+                              evidence=u[1] if u else "scan_on_push is not true",
                               rationale="Known-vulnerable packages in images go unnoticed.",
                               remediation="Add image_scanning_configuration { scan_on_push = true }.", cwe="CWE-1104",
                               category="ecr_scan"))
@@ -353,10 +593,12 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
             for vc in b.children("vpc_config"):
                 if not is_false(vc.get("endpoint_public_access")):
                     cidrs = vc.get("public_access_cidrs") or ""
+                    u = _unsure(vc, "endpoint_public_access")
                     if not cidrs or '"0.0.0.0/0"' in cidrs:
                         out.append(_f(b, rel, line=vc.line, rule_id="TF-AWS-EKS-PUBLIC-ENDPOINT",
                                       title="EKS API endpoint is open to the internet", severity="medium",
-                                      confidence="high", evidence="endpoint_public_access not false, no CIDR limit",
+                                      confidence=u[0] if u else "high",
+                                      evidence=(u[1] + ", no CIDR limit") if u else "endpoint_public_access not false, no CIDR limit",
                                       rationale="The Kubernetes control plane is exposed to credential stuffing and "
                                                 "any future API-server vulnerability.",
                                       remediation="Disable the public endpoint or restrict public_access_cidrs.",

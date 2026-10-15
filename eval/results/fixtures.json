@@ -107,6 +107,83 @@
       "missed": []
     },
     {
+      "case": "env_unquoted",
+      "safe_case": false,
+      "expected": [
+        "SECRET-HARDCODED"
+      ],
+      "got": [
+        "SECRET-HARDCODED"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "evidence_nmap_confirmed",
+      "safe_case": false,
+      "expected": [
+        "NMAP-OPEN-ADMIN",
+        "NMAP-OPEN-PORT",
+        "TF-AWS-EC2-USERDATA-SECRET",
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "got": [
+        "NMAP-OPEN-ADMIN",
+        "NMAP-OPEN-PORT",
+        "TF-AWS-EC2-USERDATA-SECRET",
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "evidence_nuclei",
+      "safe_case": false,
+      "expected": [
+        "NUCLEI-CVE-2021-41773",
+        "NUCLEI-tech-detect"
+      ],
+      "got": [
+        "NUCLEI-CVE-2021-41773",
+        "NUCLEI-tech-detect"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "evidence_safe",
+      "safe_case": true,
+      "expected": [
+        "NMAP-OPEN-PORT",
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "got": [
+        "NMAP-OPEN-PORT",
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "evidence_trivy",
+      "safe_case": false,
+      "expected": [
+        "TRIVY-DS002",
+        "TRIVY-VULNERABLE-PACKAGE"
+      ],
+      "got": [
+        "TRIVY-DS002",
+        "TRIVY-VULNERABLE-PACKAGE"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "gha_injection",
       "safe_case": false,
       "expected": [
@@ -243,6 +320,23 @@
       "missed": []
     },
     {
+      "case": "tf_conditional_values",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-DB-UNENCRYPTED",
+        "TF-AWS-KMS-NO-ROTATION",
+        "TF-AWS-UNRESOLVED-EXPOSURE"
+      ],
+      "got": [
+        "TF-AWS-DB-UNENCRYPTED",
+        "TF-AWS-KMS-NO-ROTATION",
+        "TF-AWS-UNRESOLVED-EXPOSURE"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "tf_ebs_kms",
       "safe_case": false,
       "expected": [
@@ -343,6 +437,28 @@
       "missed": []
     },
     {
+      "case": "tf_iam_assume_any",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-IAM-ROLE-ASSUME-ANY"
+      ],
+      "got": [
+        "TF-AWS-IAM-ROLE-ASSUME-ANY"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_iam_assume_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "tf_iam_scoped",
       "safe_case": true,
       "expected": [],
@@ -359,6 +475,23 @@
       ],
       "got": [
         "TF-AWS-IAM-WILDCARD"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_indexed_refs",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED",
+        "TF-AWS-EBS-UNENCRYPTED",
+        "TF-AWS-S3-POLICY-PUBLIC"
+      ],
+      "got": [
+        "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED",
+        "TF-AWS-EBS-UNENCRYPTED",
+        "TF-AWS-S3-POLICY-PUBLIC"
       ],
       "pass": true,
       "false_positives": [],
@@ -454,6 +587,34 @@
       "missed": []
     },
     {
+      "case": "tf_s3_v4_public",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-S3-NO-VERSIONING",
+        "TF-AWS-S3-POLICY-PUBLIC",
+        "TF-AWS-S3-PUBLIC-ACCESS-BLOCK-OFF",
+        "TF-AWS-S3-PUBLIC-ACL"
+      ],
+      "got": [
+        "TF-AWS-S3-NO-VERSIONING",
+        "TF-AWS-S3-POLICY-PUBLIC",
+        "TF-AWS-S3-PUBLIC-ACCESS-BLOCK-OFF",
+        "TF-AWS-S3-PUBLIC-ACL"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_s3_v4_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "tf_sg_all_ports",
       "safe_case": false,
       "expected": [
@@ -461,6 +622,34 @@
       ],
       "got": [
         "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_conditional",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-SG-OPEN-DATA"
+      ],
+      "got": [
+        "TF-AWS-SG-OPEN-DATA"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_plaintext",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-SG-OPEN-ADMIN",
+        "TF-AWS-SG-OPEN-PLAINTEXT"
+      ],
+      "got": [
+        "TF-AWS-SG-OPEN-ADMIN",
+        "TF-AWS-SG-OPEN-PLAINTEXT"
       ],
       "pass": true,
       "false_positives": [],
@@ -504,16 +693,42 @@
       "pass": true,
       "false_positives": [],
       "missed": []
+    },
+    {
+      "case": "tf_sg_v4_open",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "got": [
+        "TF-AWS-SG-OPEN-ADMIN"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_sg_v4_safe",
+      "safe_case": true,
+      "expected": [
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "got": [
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
     }
   ],
-  "n_cases": 39,
-  "passed": 39,
-  "rule_hits_tp": 51,
+  "n_cases": 54,
+  "passed": 54,
+  "rule_hits_tp": 78,
   "rule_hits_fp": 0,
   "rule_hits_fn": 0,
   "precision": 1.0,
   "recall": 1.0,
-  "safe_cases": 14,
-  "safe_cases_clean": 14,
+  "safe_cases": 18,
+  "safe_cases_clean": 18,
   "errors": {}
 }

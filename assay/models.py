@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import asdict, dataclass, field
 
-SEVERITY_POINTS = {"critical": 9.0, "high": 7.0, "medium": 5.0, "low": 3.0, "info": 1.0}
+SEVERITY_POINTS = {"critical": 9.5, "high": 7.0, "medium": 5.0, "low": 3.0, "info": 1.0}
 SEVERITIES = list(SEVERITY_POINTS)
 
 
@@ -36,12 +36,13 @@ class Finding:
     id: str = ""
     score: float = 0.0
     score_factors: list[str] = field(default_factory=list)
+    meta: dict = field(default_factory=dict)  # structured facts for correlation (ports, hosts, packages)
 
     def __post_init__(self) -> None:
         if self.severity not in SEVERITY_POINTS:
             raise ValueError(f"bad severity {self.severity}")
-        if not self.id:
-            key = f"{self.rule_id}|{self.file}|{self.resource}|{self.line}"
+        if not self.id:  # meta["key"] separates several findings of one rule on one line (e.g. per package)
+            key = f"{self.rule_id}|{self.file}|{self.resource}|{self.line}|{self.meta.get('key', '')}"
             self.id = "F-" + hashlib.sha256(key.encode()).hexdigest()[:8]
 
     def to_dict(self) -> dict:

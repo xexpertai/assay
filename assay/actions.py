@@ -9,9 +9,11 @@ to a hash-chained audit log.
 from __future__ import annotations
 
 import difflib
-import getpass
 import hashlib
+import hmac
 import json
+import os
+import secrets
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -29,9 +31,51 @@ def sha256_file(p: Path) -> str:
 
 
 # ---------------------------------------------------------------- audit log
+def keystore_dir() -> Path:
+    """Where per-run audit keys live: outside every run directory, user-private (0700)."""
+    env = os.environ.get("ASSAY_KEYSTORE")
+    base = Path(env) if env else Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "assay" / "keys"
+    base.mkdir(parents=True, exist_ok=True)
+    try:
+        base.chmod(0o700)
+    except OSError:
+        pass
+    return base
+
+
 class AuditLog:
+    """Append-only JSONL log. Each record carries the previous record's hash (chain) and an HMAC-SHA256
+    over its own hash, keyed with a per-run secret stored in the keystore, not in the run directory.
+    Editing a record breaks the chain; regenerating a consistent chain without the key breaks the MACs.
+    The key is never printed and never written inside the run directory."""
+
     def __init__(self, path: Path):
         self.path = path
+        self._key: bytes | None = None
+        self._key_id: str | None = None
+
+    # -- key handling
+    def _load(self) -> None:
+        if self._key is not None or not self.path.exists():
+            return
+        first = self.path.read_text().splitlines()[0]
+        self._key_id = json.loads(first).get("key_id")
+        if self._key_id:
+            kp = keystore_dir() / f"{self._key_id}.key"
+            if kp.exists():
+                self._key = bytes.fromhex(kp.read_text().strip())
+
+    def _new_key(self) -> None:
+        self._key_id = secrets.token_hex(8)
+        self._key = secrets.token_bytes(32)
+        kp = keystore_dir() / f"{self._key_id}.key"
+        kp.write_text(self._key.hex())
+        kp.chmod(0o600)
+
+    @property
+    def key_id(self) -> str | None:
+        self._load()
+        return self._key_id
 
     def _last_hash(self) -> str:
         if not self.path.exists():
@@ -39,24 +83,49 @@ class AuditLog:
         lines = self.path.read_text().strip().splitlines()
         return json.loads(lines[-1])["hash"] if lines else "0" * 64
 
+    def _mac(self, h: str) -> str:
+        return hmac.new(self._key, h.encode(), hashlib.sha256).hexdigest()
+
     def write(self, stage: str, event: str, **data) -> None:
+        if not self.path.exists():
+            self._new_key()
+        else:
+            self._load()
         rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "stage": stage, "event": event, "data": data,
                "prev": self._last_hash()}
+        if not self.path.exists():
+            rec["key_id"] = self._key_id
         rec["hash"] = hashlib.sha256(json.dumps(rec, sort_keys=True).encode()).hexdigest()
+        rec["mac"] = self._mac(rec["hash"]) if self._key else None
         with self.path.open("a") as fh:
             fh.write(json.dumps(rec, sort_keys=True) + "\n")
 
     def verify(self) -> tuple[bool, int]:
+        """(chain intact, records verified). See verify_full() for the MAC result."""
+        r = self.verify_full()
+        return r["chain_ok"] and r["mac_ok"] is not False, r["records"]
+
+    def verify_full(self) -> dict:
+        """chain_ok: every record hashes correctly and links to its predecessor.
+        mac_ok: True if every MAC matches under the run key; False if any fails; None if the key is unavailable."""
+        self._load()
         prev = "0" * 64
         n = 0
+        chain_ok = True
+        mac_ok: bool | None = True if self._key else None
         for line in self.path.read_text().strip().splitlines():
             rec = json.loads(line)
             h = rec.pop("hash")
+            mac = rec.pop("mac", None)
             if rec["prev"] != prev or hashlib.sha256(json.dumps(rec, sort_keys=True).encode()).hexdigest() != h:
-                return False, n
+                chain_ok = False
+                break
+            if self._key and (not mac or not hmac.compare_digest(mac, self._mac(h))):
+                mac_ok = False
             prev = h
             n += 1
-        return True, n
+        return {"chain_ok": chain_ok, "mac_ok": mac_ok if chain_ok else False, "records": n,
+                "key_id": self._key_id, "key_available": self._key is not None}
 
 
 # ---------------------------------------------------------------- patches
@@ -110,6 +179,15 @@ def tf_set_attr(text: str, block_line: int, attr: str, value: str) -> str | None
     return "".join(lines)
 
 
+def apply_fix(text: str, fix: dict) -> str | None:
+    """Apply one mechanical fix (one or several attributes on one block) to Terraform text."""
+    for attr, value in (fix.get("attrs") or {fix["attr"]: fix["value"]}).items():
+        text = tf_set_attr(text, fix["block_line"], attr, value)
+        if text is None:
+            return None
+    return text
+
+
 @dataclass
 class Action:
     id: str
@@ -133,13 +211,14 @@ def propose(findings: list[Finding], scope: Scope) -> list[Action]:
             continue
         path = scope.root / fix["file"]
         original = path.read_text()
-        new = tf_set_attr(original, fix["block_line"], fix["attr"], fix["value"])
+        new = apply_fix(original, fix)
         if new is None or new == original:
             continue
         diff = "".join(difflib.unified_diff(original.splitlines(keepends=True), new.splitlines(keepends=True),
                                             f"a/{fix['file']}", f"b/{fix['file']}", n=2))
+        sets = ", ".join(f"{k} = {v}" for k, v in (fix.get("attrs") or {fix["attr"]: fix["value"]}).items())
         actions.append(Action(f"A-{len(actions) + 1:02d}", f.id, fix["file"],
-                              f"{fix['address']}: set {fix['attr']} = {fix['value']} (fixes {f.rule_id})", diff,
+                              f"{fix['address']}: set {sets} (fixes {f.rule_id})", diff,
                               sha256_file(path), hashlib.sha256(new.encode()).hexdigest()))
     return actions
 
@@ -150,13 +229,16 @@ def plan_hash(plan: dict) -> str:
 
 # ---------------------------------------------------------------- approval + apply
 def approve(run_dir: Path, action_ids: list[str], approver: str | None = None) -> dict:
+    if not approver or not approver.strip():
+        raise ApprovalError("refused: an approval must name the person approving (--by \"Full Name\").")
+    approver = approver.strip()
     plan = json.loads((run_dir / "plan.json").read_text())
     known = {a["id"] for a in plan["actions"]}
     unknown = [a for a in action_ids if a not in known]
     if unknown:
         raise ApprovalError(f"unknown action id(s): {', '.join(unknown)}")
     rec = {"plan_sha256": plan_hash(plan), "approved": sorted(action_ids),
-           "approver": approver or getpass.getuser(), "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+           "approver": approver, "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     (run_dir / "approval.json").write_text(json.dumps(rec, indent=2))
     AuditLog(run_dir / "audit.jsonl").write("approve", "actions_approved", approver=rec["approver"],
                                              actions=rec["approved"], plan_sha256=rec["plan_sha256"])
@@ -191,8 +273,7 @@ def apply(run_dir: Path) -> list[str]:
         text = path.read_text()
         # apply bottom-up so earlier line numbers stay valid
         for a in sorted(acts, key=lambda x: -x["fix"]["block_line"]):
-            fx = a["fix"]
-            new = tf_set_attr(text, fx["block_line"], fx["attr"], fx["value"])
+            new = apply_fix(text, a["fix"])
             if new is None:
                 raise ApprovalError(f"could not apply {a['id']}")
             text = new

@@ -1,7 +1,7 @@
 """Hard-coded secret detection with redacted evidence.
 
-Assay never prints or stores a full secret value: evidence keeps the first four
-characters and the length only.
+Assay never prints or stores a full secret value: evidence keeps a 2-4 character
+prefix and the length only.
 """
 from __future__ import annotations
 
@@ -34,10 +34,12 @@ PATTERNS: list[tuple[str, re.Pattern, str]] = [
 
 SECRET_NAME = r"(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?key|auth[_-]?token|token|private[_-]?key|client[_-]?secret)"
 GENERIC_RE = re.compile(
-    rf"(?i)\b([A-Za-z0-9_\-]*{SECRET_NAME}[A-Za-z0-9_\-]*)\b[\"']?\s*(?:=|:|=>)\s*[\"']([^\"'\s$]{{6,}})[\"']"
+    rf"(?i)\b([A-Za-z0-9_\-]*{SECRET_NAME}[A-Za-z0-9_\-]*)\b[\"']?\s*(?:=|:|=>)\s*"
+    rf"(?:[\"']([^\"'\s$]{{6,}})[\"']|([^\"'\s$#,;{{}}()\[\]]{{6,}})(?=\s*(?:[#,;]|$)))"  # quoted, or a bare value ending the line
 )
 SECRET_NAME_RE = re.compile(rf"(?i){SECRET_NAME}")
-NON_SECRET_KEY_RE = re.compile(r"(?i)(_url|_uri|_endpoint|_path|_file|_name|_id|_type|_tokens|_length|_ttl|_arn)$")
+NON_SECRET_KEY_RE = re.compile(r"(?i)(_url|_uri|_endpoint|_path|_file|name|_id|_type|_tokens|_length|_ttl|_arn)$")
+EXPRESSION_RE = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_\-]*(?:\.[A-Za-z0-9_\[\]\-]+)+|[A-Z][A-Z0-9_]*)$")  # a.b.c or CONSTANT
 PLACEHOLDER_RE = re.compile(
     r"(?i)^(?:x+|\*+|changeme|change_me|example|placeholder|dummy|redacted|your[_-].*|<.*>|\{\{.*\}\}|null|none|true|false)$"
 )
@@ -56,9 +58,11 @@ def secret_tag(value: str) -> str:
 
 
 def redact(value: str) -> str:
+    """Keep a short prefix for recognition only: 4 characters when the value is 12+ long, otherwise 2."""
     if value.startswith("-----BEGIN"):
         return value  # the PEM header itself is not secret
-    return f"{value[:4]}... ({len(value)} chars, redacted)"
+    keep = 4 if len(value) >= 12 else 2
+    return f"{value[:keep]}... ({len(value)} chars, redacted)"
 
 
 def is_placeholder(value: str) -> bool:
@@ -77,8 +81,10 @@ def scan_text(text: str) -> list[SecretHit]:
                     seen.add((i, v))
                     hits.append(SecretHit(kind, v, i, conf))
         for m in GENERIC_RE.finditer(line):
-            name, v = m.group(1), m.group(2)
+            name, v = m.group(1), m.group(2) or m.group(3)
             if (i, v) in seen or is_placeholder(v) or any(v == h.value for h in hits if h.line_offset == i):
+                continue
+            if m.group(3) and EXPRESSION_RE.match(v):  # bare reference such as random_password.db.result or API_KEY
                 continue
             if NON_SECRET_KEY_RE.search(name):
                 continue

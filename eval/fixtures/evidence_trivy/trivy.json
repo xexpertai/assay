@@ -1,0 +1,27 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "registry.example/app:1.4.2",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "registry.example/app:1.4.2 (debian 11.6)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {"VulnerabilityID": "CVE-2023-0286", "PkgName": "openssl", "InstalledVersion": "1.1.1n-0+deb11u3", "FixedVersion": "1.1.1n-0+deb11u4", "Severity": "HIGH", "Title": "openssl: X.400 address type confusion"},
+        {"VulnerabilityID": "CVE-2023-0464", "PkgName": "openssl", "InstalledVersion": "1.1.1n-0+deb11u3", "FixedVersion": "1.1.1n-0+deb11u5", "Severity": "HIGH", "Title": "openssl: certificate policy check DoS"},
+        {"VulnerabilityID": "CVE-2022-3996", "PkgName": "openssl", "InstalledVersion": "1.1.1n-0+deb11u3", "Severity": "LOW", "Title": "openssl: double locking"},
+        {"VulnerabilityID": "CVE-2023-29491", "PkgName": "ncurses-bin", "InstalledVersion": "6.2+20201114-2", "Severity": "MEDIUM", "Title": "ncurses: local user may trigger security-relevant memory corruption"}
+      ]
+    },
+    {
+      "Target": "Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "Misconfigurations": [
+        {"ID": "DS002", "Title": "Image user should not be 'root'", "Description": "Running as root increases the impact of a container compromise.", "Severity": "HIGH", "Status": "FAIL", "Resolution": "Add 'USER <non root user>' before the entrypoint."},
+        {"ID": "DS026", "Title": "No HEALTHCHECK defined", "Severity": "LOW", "Status": "PASS"}
+      ]
+    }
+  ]
+}

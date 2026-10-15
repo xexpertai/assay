@@ -67,8 +67,9 @@ def to_markdown(res) -> str:
     lines += ["## Agent decisions", "", "| Stage | Decision | Reason |", "|---|---|---|"]
     for d in res.decisions:
         lines.append(f"| {d.stage} | {_esc(d.action)} | {_esc(d.reason)} |")
-    lines += ["", "_Secrets are shown redacted (first 4 characters and length only). Findings come from "
-              "deterministic rules; a human should confirm them before acting._", ""]
+    lines += ["", "_Secrets are shown redacted (a 2-4 character prefix and the length only). Findings come from "
+              "deterministic rules; a human should confirm them before acting. The audit log is keyed (HMAC) and "
+              "hash-chained: `assay verify-log`._", ""]
     return "\n".join(lines)
 
 

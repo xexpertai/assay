@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Template evidence file (fictional lab address 10.10.0.5, TEST-NET-style private range). -->
+<nmaprun scanner="nmap" args="nmap -sV -oX nmap.xml 10.10.0.5" start="1760000000" version="7.94">
+  <host starttime="1760000000" endtime="1760000010">
+    <status state="up" reason="echo-reply"/>
+    <address addr="10.10.0.5" addrtype="ipv4"/>
+    <hostnames><hostname name="bastion.lab.internal" type="PTR"/></hostnames>
+    <ports>
+      <port protocol="tcp" portid="22"><state state="open" reason="syn-ack"/><service name="ssh" product="OpenSSH" version="7.2p2"/></port>
+      <port protocol="tcp" portid="443"><state state="open" reason="syn-ack"/><service name="https" product="nginx"/></port>
+      <port protocol="tcp" portid="8080"><state state="closed" reason="reset"/></port>
+    </ports>
+  </host>
+</nmaprun>

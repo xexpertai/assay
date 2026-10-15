@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from .models import Artifact
+from .rules.toolout import kind_of as tool_kind
 from .scope import Scope
 
 K8S_RE = re.compile(r"^\s*apiVersion:\s*\S+", re.M)
@@ -14,6 +15,9 @@ K8S_KIND_RE = re.compile(r"^\s*kind:\s*\S+", re.M)
 def classify(path: Path, head: str) -> str:
     name = path.name.lower()
     parts = [p.lower() for p in path.parts]
+    tool = tool_kind(name, head)
+    if tool:
+        return tool
     if name.endswith(".tf"):
         return "terraform"
     if name == "dockerfile" or name.startswith("dockerfile.") or name.endswith(".dockerfile"):

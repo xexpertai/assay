@@ -1,0 +1,7 @@
+{
+  "name": "example-lab (template: replace every value)",
+  "authorised_by": "Name of the person who owns the lab and authorises the assessment",
+  "expires": "2026-11-07",
+  "hosts": ["bastion.lab.internal"],
+  "networks": ["10.10.0.0/24"]
+}

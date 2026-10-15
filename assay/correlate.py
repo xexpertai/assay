@@ -24,6 +24,10 @@ class Facts:
     tf_refs: dict[str, set[str]] = field(default_factory=dict)  # address -> referenced addresses
     k8s_sa: dict[str, str] = field(default_factory=dict)  # "Kind/name" -> service account
     admin_sas: set[str] = field(default_factory=set)  # service accounts bound to cluster-admin
+    observed: dict[str, dict[int, str]] = field(default_factory=dict)  # host -> {port: service} from tool output
+    dropped: list[tuple[str, str, str]] = field(default_factory=list)  # (file, host, reason) out-of-policy evidence
+    specific_secret_lines: set[tuple[str, int]] = field(default_factory=set)
+    policy: object = None  # ScopePolicy; set by the agent
 
 
 def _chain_id(kind: str, ids: list[str]) -> str:
@@ -139,6 +143,34 @@ def correlate(findings: list[Finding], facts: Facts) -> list[Chain]:
                                 + ", ".join(sorted(f"{a} ({b})" for a, b in places))
                                 + ". Rotating it requires changing every copy, and any one leak exposes all users "
                                   "of it.", sorted({f.resource for f in fs})))
+    # 6. Configured exposure confirmed by observation (IaC says open to the world; a scan file saw it open)
+    if facts.observed:
+        for addr, fs in by_res.items():
+            cfg = [f for f in fs if f.category == "sg_open_admin" and f.meta.get("ports")]
+            for f in cfg:
+                lo, hi = f.meta["ports"]
+                seen = [(h, p, svc) for h, ports in facts.observed.items() for p, svc in ports.items() if lo <= p <= hi]
+                if not seen:
+                    continue
+                obs = [g for g in findings if g.category == "observed_admin_port"
+                       and any(g.meta.get("host") == h and g.meta.get("port") == p for h, p, _ in seen)]
+                secrets = [g for g in by_res.get(addr, []) if g.category in SECRET_CATS]
+                for n in _neighbours(facts, addr):
+                    secrets += [g for g in by_res.get(n, []) if g.category in SECRET_CATS]
+                ids = [f.id] + [g.id for g in obs] + [g.id for g in secrets]
+                where = "; ".join(f"{h}:{p} ({svc or 'service unknown'})" for h, p, svc in seen[:3])
+                sev = "critical" if secrets else "high"
+                chains.append(Chain(_chain_id("confirmed-exposure", ids),
+                                    f"Configured exposure on {addr} is confirmed by observation" +
+                                    (" and the host holds credentials" if secrets else ""), sev, ids,
+                                    f"{addr} opens port {lo}" + (f"-{hi}" if hi != lo else "") +
+                                    f" to the world in the configuration, and a scan output file saw it open on {where}."
+                                    " The match is by port number (the scan file does not name the Terraform resource), "
+                                    "so confirm the host belongs to this resource. " +
+                                    (f"Credentials found in the same configuration ({len(secrets)}) would be the first "
+                                     "thing an intruder on that host collects." if secrets else
+                                     "This is no longer a theoretical misconfiguration: the service is reachable."),
+                                    sorted({addr, *(g.resource for g in obs)})))
     # de-duplicate identical chains
     uniq = {c.id: c for c in chains}
     return list(uniq.values())
@@ -167,4 +199,5 @@ def prioritise(findings: list[Finding], chains: list[Chain]) -> list[Finding]:
             factors.append(f"part of chain {in_chain[f.id][0].id} +1.5")
         f.score = round(min(score, 10.0), 1)
         f.score_factors = factors
-    return sorted(findings, key=lambda f: (-f.score, f.file, f.line))
+    order = list(SEVERITY_POINTS)
+    return sorted(findings, key=lambda f: (-f.score, order.index(f.severity), f.file, f.line))

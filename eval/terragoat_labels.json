@@ -1,6 +1,6 @@
 {
   "source": "bridgecrewio/terragoat (Apache-2.0), commit 729f8da62c6a85ce4af5ad3d123de97776d954c4",
-  "method": "Each label is one weakness that TerraGoat's own authors annotated with a comment inside a resource block. Comments that are not weakness statements were excluded: 'Ignore password changes from tf plan diff', '### EC2 instance', '### Config from ...', '# VPC Flow Logs to S3', the commented-out 'encrypted = false' line, and the commented-out neptune 'publicly_accessible = true' line (inactive code). Assay strips all comments before analysis. accept = Assay rule IDs that count as detecting the weakness.",
+  "method": "Each label is one weakness that TerraGoat's own authors annotated with a comment inside a resource block. Comments that are not weakness statements were excluded: 'Ignore password changes from tf plan diff', '### EC2 instance', '### Config from ...', '# VPC Flow Logs to S3', the commented-out 'encrypted = false' line, and the commented-out neptune 'publicly_accessible = true' line (inactive code). Assay strips all comments before analysis. accept = Assay rule IDs that count as detecting the weakness. coverage=out: no rules for that cloud yet. coverage=stale: the annotation does not match the code at the pinned commit (see note).",
   "labels": [
     {"file": "terraform/aws/db-app.tf", "resource": "aws_instance.db_app", "annotation": "ec2 have plain text secrets in user data", "accept": ["TF-AWS-EC2-USERDATA-SECRET"]},
     {"file": "terraform/aws/ec2.tf", "resource": "aws_instance.web_host", "annotation": "ec2 have plain text secrets in user data", "accept": ["TF-AWS-EC2-USERDATA-SECRET"]},
@@ -9,7 +9,7 @@
     {"file": "terraform/aws/ec2.tf", "resource": "aws_security_group.web-node", "annotation": "security group is open to the world in SSH port", "accept": ["TF-AWS-SG-OPEN-ADMIN"]},
     {"file": "terraform/aws/kms.tf", "resource": "aws_kms_key.logs_key", "annotation": "key does not have rotation enabled", "accept": ["TF-AWS-KMS-NO-ROTATION"]},
     {"file": "terraform/aws/lambda.tf", "resource": "aws_lambda_function.analysis_lambda", "annotation": "lambda have plain text secrets in environment variables", "accept": ["TF-AWS-LAMBDA-ENV-SECRET"]},
-    {"file": "terraform/aws/s3.tf", "resource": "aws_s3_bucket.data", "annotation": "bucket is public", "accept": ["TF-AWS-S3-PUBLIC-ACL", "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK"]},
+    {"file": "terraform/aws/s3.tf", "resource": "aws_s3_bucket.data", "annotation": "bucket is public", "accept": ["TF-AWS-S3-PUBLIC-ACL", "TF-AWS-S3-POLICY-PUBLIC"], "coverage": "stale", "note": "At commit 729f8da this bucket has no acl, no aws_s3_bucket_acl and no bucket policy, so the annotation no longer matches the code. Excluded from the recall count rather than credited through the weaker 'no public access block' rule."},
     {"file": "terraform/aws/s3.tf", "resource": "aws_s3_bucket.data", "annotation": "bucket is not encrypted", "accept": ["TF-AWS-S3-NO-ENCRYPTION"]},
     {"file": "terraform/aws/s3.tf", "resource": "aws_s3_bucket.data", "annotation": "bucket does not have access logs", "accept": ["TF-AWS-S3-NO-LOGGING"]},
     {"file": "terraform/aws/s3.tf", "resource": "aws_s3_bucket.data", "annotation": "bucket does not have versioning", "accept": ["TF-AWS-S3-NO-VERSIONING"]},

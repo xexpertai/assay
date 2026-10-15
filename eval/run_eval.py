@@ -12,7 +12,9 @@ Usage:  python -m eval.run_eval   (run scripts/get-samples.sh first for the exte
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import shutil
 import tempfile
 import time
@@ -24,6 +26,7 @@ from assay.agent import run
 from assay.scope import ScopeError
 
 ROOT = Path(__file__).resolve().parent
+INFO_ONLY = {"TF-AWS-SG-INTERNET-FACING", "NMAP-OPEN-PORT"}  # a case expecting only these counts as "safe"
 RESULTS = ROOT / "results"
 SAMPLES = ROOT.parent / "samples"
 
@@ -40,14 +43,16 @@ def fixtures() -> dict:
             shutil.copytree(case, dst, ignore=shutil.ignore_patterns("expected.json"))
             res = run(str(dst))
         got = {f.rule_id for f in res.findings}
+        want_conf = json.loads((case / "expected.json").read_text()).get("confidence", {})
+        conf_ok = all(any(f.rule_id == r and f.confidence == c for f in res.findings) for r, c in want_conf.items())
         c_tp, c_fp, c_fn = expected & got, got - expected, expected - got
         tp, fp, fn = tp + len(c_tp), fp + len(c_fp), fn + len(c_fn)
         for r in c_fp:
             per_rule[f"FP {r}"] += 1
         for r in c_fn:
             per_rule[f"FN {r}"] += 1
-        cases.append({"case": case.name, "safe_case": not expected or expected == {"TF-AWS-SG-INTERNET-FACING"},
-                      "expected": sorted(expected), "got": sorted(got), "pass": got == expected,
+        cases.append({"case": case.name, "safe_case": expected <= INFO_ONLY,
+                      "expected": sorted(expected), "got": sorted(got), "pass": got == expected and conf_ok,
                       "false_positives": sorted(c_fp), "missed": sorted(c_fn)})
     safe = [c for c in cases if c["safe_case"]]
     return {"cases": cases, "n_cases": len(cases), "passed": sum(c["pass"] for c in cases),
@@ -73,11 +78,13 @@ def terragoat() -> dict | None:
                and f.file == lab["file"]]
         matched_ids.update(f.id for f in hit)
         rows.append({**lab, "detected": bool(hit), "by": sorted({f.rule_id for f in hit})})
-    in_cov = [r for r in rows if r.get("coverage") != "out"]
+    in_cov = [r for r in rows if not r.get("coverage")]
+    stale = [r for r in rows if r.get("coverage") == "stale"]
     aws_extra = [f for f in res.findings if f.file.startswith("terraform/aws/") and f.id not in matched_ids
                  and f.severity != "info"]
     return {
         "labels_total": len(rows), "detected_total": sum(r["detected"] for r in rows),
+        "labels_stale": [{"resource": r["resource"], "annotation": r["annotation"], "note": r["note"]} for r in stale],
         "labels_in_rule_coverage": len(in_cov), "detected_in_coverage": sum(r["detected"] for r in in_cov),
         "recall_all": round(sum(r["detected"] for r in rows) / len(rows), 3),
         "recall_in_coverage": round(sum(r["detected"] for r in in_cov) / len(in_cov), 3),
@@ -107,8 +114,37 @@ def k8sgoat() -> dict | None:
             "chains": [c.title for c in res.chains], "wall_s": wall, "files": res.counts["files"]}
 
 
+def sadcloud() -> dict | None:
+    """Blind sample: labels were written after the first run and the rules were frozen before it."""
+    target = SAMPLES / "sadcloud"
+    if not target.exists():
+        return None
+    spec = json.loads((ROOT / "sadcloud_labels.json").read_text())
+    t = time.perf_counter()
+    res = run(str(target))
+    wall = round(time.perf_counter() - t, 2)
+    rows = []
+    for lab in spec["labels"]:
+        hit = sorted({f.rule_id for f in res.findings if f.rule_id in lab["accept"] and f.file == lab["file"]
+                      and (f.resource == lab["resource"] or f.resource == lab["file"])})
+        rows.append({**lab, "detected": bool(hit), "by": hit})
+    by_kind = {}
+    for k in ("literal", "conditional", "variable", "none"):
+        ks = [r for r in rows if r["kind"] == k]
+        by_kind[k] = {"labels": len(ks), "detected": sum(r["detected"] for r in ks)}
+    fair = [r for r in rows if r["kind"] in ("literal", "conditional")]
+    return {"blind": True, "labels_total": len(rows), "by_kind": by_kind,
+            "detected_in_rule_coverage": sum(r["detected"] for r in fair), "labels_in_rule_coverage": len(fair),
+            "missed_in_coverage": [{"flag": r["flag"], "module": r["module"], "note": r.get("note", "")}
+                                   for r in fair if not r["detected"]],
+            "rows": rows, "total_findings": len(res.findings), "by_rule": dict(Counter(f.rule_id for f in res.findings)),
+            "chains": [c.title for c in res.chains], "wall_s": wall, "files": res.counts["files"]}
+
+
 def safety() -> dict:
     checks = []
+    keystore = tempfile.mkdtemp(prefix="assay-keys-")
+    os.environ["ASSAY_KEYSTORE"] = keystore  # keep evaluation keys out of the user's real keystore
 
     def check(name, fn):
         try:
@@ -181,6 +217,33 @@ def safety() -> dict:
             return not AuditLog(p).verify()[0]
         check("audit log tampering detected", tamper_log)
 
+        def forged_chain():
+            # rebuild a self-consistent chain without the run key: hashes pass, MACs fail
+            p = out / "audit.jsonl"
+            prev, forged = "0" * 64, []
+            for line in p.read_text().splitlines():
+                rec = json.loads(line)
+                rec.pop("hash"), rec.pop("mac", None)
+                rec["prev"], rec["data"]["forged"] = prev, True
+                rec["hash"] = hashlib.sha256(json.dumps(rec, sort_keys=True).encode()).hexdigest()
+                rec["mac"] = "00" * 32
+                prev = rec["hash"]
+                forged.append(json.dumps(rec, sort_keys=True))
+            p.write_text("\n".join(forged) + "\n")
+            r = AuditLog(p).verify_full()
+            return r["chain_ok"] and r["mac_ok"] is False
+        check("re-written audit chain without the run key is detected (HMAC)", forged_chain)
+        check("run key is stored outside the run directory",
+              lambda: not any(p.suffix == ".key" for p in out.iterdir()) and os.listdir(keystore))
+
+        def unnamed_approver():
+            try:
+                approve(out, [res.actions[0].id], "")
+            except ApprovalError:
+                return True
+            return False
+        check("approval without a named person is refused", unnamed_approver)
+
     with tempfile.TemporaryDirectory() as td:
         src = Path(td) / "repo"
         src.mkdir()
@@ -195,10 +258,11 @@ def safety() -> dict:
 
 def main() -> None:
     RESULTS.mkdir(exist_ok=True)
-    out = {"fixtures": fixtures(), "terragoat": terragoat(), "kubernetes_goat": k8sgoat(), "safety": safety()}
+    out = {"fixtures": fixtures(), "terragoat": terragoat(), "kubernetes_goat": k8sgoat(), "sadcloud": sadcloud(),
+           "safety": safety()}
     for k, v in out.items():
         (RESULTS / f"{k}.json").write_text(json.dumps(v, indent=2))
-    f, tg, kg, s = out["fixtures"], out["terragoat"], out["kubernetes_goat"], out["safety"]
+    f, tg, kg, sc, s = out["fixtures"], out["terragoat"], out["kubernetes_goat"], out["sadcloud"], out["safety"]
     lines = ["# Evaluation summary (generated by eval/run_eval.py)", "",
              f"- Rule conformance suite: {f['passed']}/{f['n_cases']} cases exact; rule-level precision "
              f"{f['precision']}, recall {f['recall']} (TP {f['rule_hits_tp']}, FP {f['rule_hits_fp']}, FN "
@@ -212,6 +276,22 @@ def main() -> None:
     if kg:
         lines.append(f"- Kubernetes Goat static scenarios: {kg['detected']}/{kg['scenarios']} detected; "
                      f"{kg['total_findings']} findings, {len(kg['chains'])} chains, {kg['wall_s']} s.")
+    if sc:
+        frozen = RESULTS / "sadcloud_blind_frozen.json"
+        if frozen.exists():
+            fz = json.loads(frozen.read_text())
+            lines.append(f"- sadcloud BLIND result (rules frozen at tag rules-frozen-for-blind-sample, labels written after "
+                         f"the first run, never re-tuned): {fz['detected_in_rule_coverage']}/{fz['labels_in_rule_coverage']} "
+                         f"flags detected where a rule exists and the value is visible; misses: "
+                         + ", ".join(m["flag"] for m in fz["missed_in_coverage"]) + ".")
+        bk = sc["by_kind"]
+        lines.append(f"- sadcloud after the post-blind fixes (NOT blind any more): "
+                     f"{sc['detected_in_rule_coverage']}/{sc['labels_in_rule_coverage']} misconfiguration flags detected "
+                     f"where Assay has a rule and the value is visible (literal {bk['literal']['detected']}/{bk['literal']['labels']}, "
+                     f"conditional {bk['conditional']['detected']}/{bk['conditional']['labels']}); "
+                     f"{bk['variable']['detected']}/{bk['variable']['labels']} where the value is a bare variable; "
+                     f"{bk['none']['labels']} of {sc['labels_total']} flags have no Assay rule. "
+                     f"{sc['total_findings']} findings, {len(sc['chains'])} chains, {sc['wall_s']} s.")
     lines.append(f"- Safety checks: {s['passed']}/{s['total']} passed.")
     if f["errors"]:
         lines.append(f"- Conformance errors: {f['errors']}")

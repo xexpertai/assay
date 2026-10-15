@@ -1,0 +1,763 @@
+{
+ "source": "nccgroup/sadcloud (Apache-2.0), commit f538652921a7f3e8e25c0afaecad2d4382f8b21e",
+ "method": "BLIND SAMPLE. The repository was first opened after the rules were frozen (git tag rules-frozen-for-blind-sample). One label per misconfiguration flag in modules/aws/*/variables.tf (the README says ~84; parameters such as vpc_id, subnet ids, name, sse_algorithm and logging_bucket are not misconfigurations and are excluded; the commented-out eks globally_accessible line is inactive). The flag-to-rule mapping was written AFTER the first run, by reading each module; the rules themselves were not changed before the blind numbers were recorded. kind: literal = the weakness is a literal value in the .tf; conditional = `var.flag ? bad : good` (a scanner that does not resolve variables can only flag the possibility); variable = bare `var.flag` (invisible without tfvars); none = Assay has no rule for this class.",
+ "labels": [
+  {
+   "module": "acm",
+   "flag": "certificate_transparency_disabled",
+   "kind": "none",
+   "file": "modules/aws/acm/main.tf",
+   "resource": "aws_acm_certificate.main",
+   "accept": []
+  },
+  {
+   "module": "cloudformation",
+   "flag": "stack_with_role",
+   "kind": "none",
+   "file": "modules/aws/cloudformation/main.tf",
+   "resource": "aws_cloudformation_stack.main",
+   "accept": []
+  },
+  {
+   "module": "cloudformation",
+   "flag": "stack_with_secret_output",
+   "kind": "literal",
+   "file": "sadcloud/static/Secret_Output.yaml",
+   "resource": "sadcloud/static/Secret_Output.yaml",
+   "accept": [
+    "SECRET-HARDCODED"
+   ],
+   "note": "the secret lives in the template file the stack uploads"
+  },
+  {
+   "module": "cloudtrail",
+   "flag": "no_data_logging",
+   "kind": "none",
+   "file": "modules/aws/cloudtrail/main.tf",
+   "resource": "aws_cloudtrail.main",
+   "accept": []
+  },
+  {
+   "module": "cloudtrail",
+   "flag": "no_global_services_logging",
+   "kind": "none",
+   "file": "modules/aws/cloudtrail/main.tf",
+   "resource": "aws_cloudtrail.main",
+   "accept": []
+  },
+  {
+   "module": "cloudtrail",
+   "flag": "no_log_file_validation",
+   "kind": "none",
+   "file": "modules/aws/cloudtrail/main.tf",
+   "resource": "aws_cloudtrail.main",
+   "accept": []
+  },
+  {
+   "module": "cloudtrail",
+   "flag": "no_logging",
+   "kind": "none",
+   "file": "modules/aws/cloudtrail/main.tf",
+   "resource": "aws_cloudtrail.main",
+   "accept": []
+  },
+  {
+   "module": "cloudtrail",
+   "flag": "duplicated_global_services_logging",
+   "kind": "none",
+   "file": "modules/aws/cloudtrail/main.tf",
+   "resource": "aws_cloudtrail.main",
+   "accept": []
+  },
+  {
+   "module": "cloudtrail",
+   "flag": "not_configured",
+   "kind": "none",
+   "file": "modules/aws/cloudtrail/main.tf",
+   "resource": "aws_cloudtrail.main",
+   "accept": []
+  },
+  {
+   "module": "cloudwatch",
+   "flag": "alarm_without_actions",
+   "kind": "none",
+   "file": "modules/aws/cloudwatch/main.tf",
+   "resource": "aws_cloudwatch_metric_alarm.main",
+   "accept": []
+  },
+  {
+   "module": "config",
+   "flag": "config_recorder_not_configured",
+   "kind": "none",
+   "file": "modules/aws/config/main.tf",
+   "resource": "aws_config_configuration_recorder.main",
+   "accept": []
+  },
+  {
+   "module": "ebs",
+   "flag": "ebs_default_encryption_disabled",
+   "kind": "none",
+   "file": "modules/aws/ebs/main.tf",
+   "resource": "aws_ebs_encryption_by_default.main",
+   "accept": []
+  },
+  {
+   "module": "ebs",
+   "flag": "ebs_volume_unencrypted",
+   "kind": "conditional",
+   "file": "modules/aws/ebs/main.tf",
+   "resource": "aws_ebs_volume.main",
+   "accept": [
+    "TF-AWS-EBS-UNENCRYPTED"
+   ]
+  },
+  {
+   "module": "ebs",
+   "flag": "ebs_snapshot_unencrypted",
+   "kind": "conditional",
+   "file": "modules/aws/ebs/main.tf",
+   "resource": "aws_ebs_snapshot.main_snapshot",
+   "accept": [
+    "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED"
+   ],
+   "note": "volume_id = aws_ebs_volume.main[0].id (indexed reference)"
+  },
+  {
+   "module": "ec2",
+   "flag": "disallowed_instance_type",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_instance.main",
+   "accept": []
+  },
+  {
+   "module": "ec2",
+   "flag": "instance_with_public_ip",
+   "kind": "variable",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_instance.main",
+   "accept": [
+    "TF-AWS-EC2-PUBLIC-IP"
+   ]
+  },
+  {
+   "module": "ec2",
+   "flag": "instance_with_user_data_secrets",
+   "kind": "conditional",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_instance.main",
+   "accept": [
+    "TF-AWS-EC2-USERDATA-SECRET"
+   ],
+   "note": "literal AKIA key inside the conditional"
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_all_ports_to_all",
+   "kind": "literal",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.all_ports_to_all",
+   "accept": [
+    "TF-AWS-SG-OPEN-ADMIN"
+   ]
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_all_ports_to_self",
+   "kind": "literal",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.all_ports_to_self",
+   "accept": [
+    "TF-AWS-SG-OPEN-ADMIN"
+   ],
+   "note": "the block has self = true AND cidr_blocks = [\"0.0.0.0/0\"], so a world-open finding is literally correct"
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_icmp_to_all",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.icmp_to_all",
+   "accept": []
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_known_port_to_all",
+   "kind": "literal",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.known_port_to_all",
+   "accept": [
+    "TF-AWS-SG-OPEN-ADMIN",
+    "TF-AWS-SG-OPEN-DATA"
+   ]
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_plaintext_port",
+   "kind": "literal",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.opens_plaintext_port",
+   "accept": [
+    "TF-AWS-SG-OPEN-ADMIN",
+    "TF-AWS-SG-OPEN-PLAINTEXT"
+   ],
+   "note": "FTP 21 and Telnet 23 to the world"
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_port_range",
+   "kind": "literal",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.opens_port_range",
+   "accept": [
+    "TF-AWS-SG-OPEN-ADMIN",
+    "TF-AWS-SG-OPEN-PLAINTEXT"
+   ],
+   "note": "21-25 to the world"
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_opens_port_to_all",
+   "kind": "literal",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.opens_port_to_all",
+   "accept": [
+    "TF-AWS-SG-OPEN-ADMIN",
+    "TF-AWS-SG-OPEN-PLAINTEXT"
+   ],
+   "note": "21 to the world"
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_whitelists_aws_ip_from_banned_region",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.whitelists_aws_ip_from_banned_region",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ec2",
+   "flag": "security_group_whitelists_aws",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.whitelists_aws",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ec2",
+   "flag": "ec2_security_group_whitelists_unknown_cidrs",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.whitelists_unknown_cidrs",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ec2",
+   "flag": "ec2_unused_security_group",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.unused_security_group",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ec2",
+   "flag": "ec2_unneeded_security_group",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.unneeded_security_group",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ec2",
+   "flag": "ec2_unexpected_security_group",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.unexpected_security_group",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ec2",
+   "flag": "ec2_overlapping_security_group",
+   "kind": "none",
+   "file": "modules/aws/ec2/main.tf",
+   "resource": "aws_security_group.overlapping_security_group",
+   "accept": [],
+   "note": "needs account-level context"
+  },
+  {
+   "module": "ecr",
+   "flag": "ecr_scanning_disabled",
+   "kind": "conditional",
+   "file": "modules/aws/ecr/main.tf",
+   "resource": "aws_ecr_repository.main",
+   "accept": [
+    "TF-AWS-ECR-NO-SCAN"
+   ]
+  },
+  {
+   "module": "ecr",
+   "flag": "ecr_repo_public",
+   "kind": "none",
+   "file": "modules/aws/ecr/main.tf",
+   "resource": "aws_ecr_repository_policy.mainecrpolicy",
+   "accept": []
+  },
+  {
+   "module": "eks",
+   "flag": "out_of_date",
+   "kind": "none",
+   "file": "modules/aws/eks/main.tf",
+   "resource": "aws_eks_cluster.example",
+   "accept": []
+  },
+  {
+   "module": "eks",
+   "flag": "no_logs",
+   "kind": "none",
+   "file": "modules/aws/eks/main.tf",
+   "resource": "aws_eks_cluster.example",
+   "accept": []
+  },
+  {
+   "module": "eks",
+   "flag": "publicly_accessible",
+   "kind": "variable",
+   "file": "modules/aws/eks/main.tf",
+   "resource": "aws_eks_cluster.example",
+   "accept": [
+    "TF-AWS-EKS-PUBLIC-ENDPOINT"
+   ],
+   "note": "endpoint_public_access = var.publicly_accessible; Assay flags because it is not literally false"
+  },
+  {
+   "module": "elasticsearch",
+   "flag": "elasticsearch_logging_disabled",
+   "kind": "none",
+   "file": "modules/aws/elasticsearch/main.tf",
+   "resource": "aws_elasticsearch_domain.main",
+   "accept": []
+  },
+  {
+   "module": "elasticsearch",
+   "flag": "elasticsearch_open_access",
+   "kind": "none",
+   "file": "modules/aws/elasticsearch/main.tf",
+   "resource": "aws_elasticsearch_domain_policy.main",
+   "accept": []
+  },
+  {
+   "module": "elb",
+   "flag": "no_access_logs",
+   "kind": "conditional",
+   "file": "modules/aws/elb/main.tf",
+   "resource": "aws_elb.main",
+   "accept": [
+    "TF-AWS-ELB-NO-LOGS"
+   ]
+  },
+  {
+   "module": "elbv2",
+   "flag": "no_access_logs",
+   "kind": "none",
+   "file": "modules/aws/elbv2/main.tf",
+   "resource": "aws_lb.main",
+   "accept": []
+  },
+  {
+   "module": "elbv2",
+   "flag": "no_deletion_protection",
+   "kind": "none",
+   "file": "modules/aws/elbv2/main.tf",
+   "resource": "aws_lb.main",
+   "accept": []
+  },
+  {
+   "module": "elbv2",
+   "flag": "older_ssl_policy",
+   "kind": "none",
+   "file": "modules/aws/elbv2/main.tf",
+   "resource": "aws_lb_listener.main",
+   "accept": []
+  },
+  {
+   "module": "glacier",
+   "flag": "glacier_public",
+   "kind": "none",
+   "file": "modules/aws/glacier/main.tf",
+   "resource": "aws_glacier_vault.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_minimum_length",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_no_lowercase_required",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_no_numbers_required",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_no_uppercase_required",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_no_symbol_required",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_reuse_enabled",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "password_policy_expiration_threshold",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_account_password_policy.main",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "managed_allows_passrole",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_policy.policy",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "inline_role_policy",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_role_policy.inline_role_policy",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "inline_group_policy",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_group_policy.inline_group_policy",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "inline_user_policy",
+   "kind": "none",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_user_policy.inline_user_policy",
+   "accept": []
+  },
+  {
+   "module": "iam",
+   "flag": "assume_role_policy_allows_all",
+   "kind": "literal",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_role.allow_all",
+   "accept": [
+    "TF-AWS-IAM-ROLE-ASSUME-ANY"
+   ]
+  },
+  {
+   "module": "iam",
+   "flag": "assume_role_no_mfa",
+   "kind": "literal",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_role.allow_all_and_no_mfa",
+   "accept": [
+    "TF-AWS-IAM-ROLE-ASSUME-ANY"
+   ],
+   "note": "detected by the wildcard-principal rule; the missing MFA condition is not a separate check"
+  },
+  {
+   "module": "iam",
+   "flag": "admin_iam_policy",
+   "kind": "literal",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_policy.policy",
+   "accept": [
+    "TF-AWS-IAM-WILDCARD"
+   ]
+  },
+  {
+   "module": "iam",
+   "flag": "admin_not_indicated_policy",
+   "kind": "literal",
+   "file": "modules/aws/iam/main.tf",
+   "resource": "aws_iam_policy.admin_not_indicated_policy",
+   "accept": [
+    "TF-AWS-IAM-WILDCARD"
+   ]
+  },
+  {
+   "module": "kms",
+   "flag": "key_rotation_disabled",
+   "kind": "conditional",
+   "file": "modules/aws/kms/main.tf",
+   "resource": "aws_kms_key.main",
+   "accept": [
+    "TF-AWS-KMS-NO-ROTATION"
+   ]
+  },
+  {
+   "module": "kms",
+   "flag": "kms_key_exposed",
+   "kind": "none",
+   "file": "modules/aws/kms/main.tf",
+   "resource": "aws_kms_key.exposed",
+   "accept": [],
+   "note": "key policy with a wildcard principal; Assay checks bucket and assume-role policies only"
+  },
+  {
+   "module": "lightsail",
+   "flag": "lightsail_in_use",
+   "kind": "none",
+   "file": "modules/aws/lightsail/main.tf",
+   "resource": "aws_lightsail_instance.main",
+   "accept": []
+  },
+  {
+   "module": "rds",
+   "flag": "no_minor_upgrade",
+   "kind": "none",
+   "file": "modules/aws/rds/main.tf",
+   "resource": "aws_db_instance.main",
+   "accept": []
+  },
+  {
+   "module": "rds",
+   "flag": "backup_disabled",
+   "kind": "none",
+   "file": "modules/aws/rds/main.tf",
+   "resource": "aws_db_instance.main",
+   "accept": []
+  },
+  {
+   "module": "rds",
+   "flag": "storage_not_encrypted",
+   "kind": "conditional",
+   "file": "modules/aws/rds/main.tf",
+   "resource": "aws_db_instance.main",
+   "accept": [
+    "TF-AWS-DB-UNENCRYPTED"
+   ]
+  },
+  {
+   "module": "rds",
+   "flag": "single_az",
+   "kind": "none",
+   "file": "modules/aws/rds/main.tf",
+   "resource": "aws_db_instance.main",
+   "accept": []
+  },
+  {
+   "module": "rds",
+   "flag": "rds_publicly_accessible",
+   "kind": "variable",
+   "file": "modules/aws/rds/main.tf",
+   "resource": "aws_db_instance.main",
+   "accept": [
+    "TF-AWS-DB-PUBLIC",
+    "TF-AWS-UNRESOLVED-EXPOSURE"
+   ],
+   "note": "post-blind: Assay now reports a low-confidence 'depends on a variable' finding"
+  },
+  {
+   "module": "redshift",
+   "flag": "parameter_group_ssl_not_required",
+   "kind": "none",
+   "file": "modules/aws/redshift/main.tf",
+   "resource": "aws_redshift_cluster.main",
+   "accept": []
+  },
+  {
+   "module": "redshift",
+   "flag": "parameter_group_logging_disabled",
+   "kind": "none",
+   "file": "modules/aws/redshift/main.tf",
+   "resource": "aws_redshift_cluster.main",
+   "accept": []
+  },
+  {
+   "module": "redshift",
+   "flag": "cluster_publicly_accessible",
+   "kind": "none",
+   "file": "modules/aws/redshift/main.tf",
+   "resource": "aws_redshift_cluster.main",
+   "accept": []
+  },
+  {
+   "module": "redshift",
+   "flag": "cluster_no_version_upgrade",
+   "kind": "none",
+   "file": "modules/aws/redshift/main.tf",
+   "resource": "aws_redshift_cluster.main",
+   "accept": []
+  },
+  {
+   "module": "redshift",
+   "flag": "cluster_database_not_encrypted",
+   "kind": "none",
+   "file": "modules/aws/redshift/main.tf",
+   "resource": "aws_redshift_cluster.main",
+   "accept": []
+  },
+  {
+   "module": "s3",
+   "flag": "bucket_acl",
+   "kind": "variable",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.logging",
+   "accept": [
+    "TF-AWS-S3-PUBLIC-ACL",
+    "TF-AWS-UNRESOLVED-EXPOSURE"
+   ],
+   "note": "acl = var.bucket_acl; post-blind: Assay now reports a low-confidence 'depends on a variable' finding"
+  },
+  {
+   "module": "s3",
+   "flag": "allow_cleartext",
+   "kind": "none",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.main",
+   "accept": [],
+   "note": "absence of a force-SSL policy"
+  },
+  {
+   "module": "s3",
+   "flag": "no_default_encryption",
+   "kind": "conditional",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.main",
+   "accept": [
+    "TF-AWS-S3-NO-ENCRYPTION"
+   ],
+   "note": "dynamic block"
+  },
+  {
+   "module": "s3",
+   "flag": "no_logging",
+   "kind": "conditional",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.main",
+   "accept": [
+    "TF-AWS-S3-NO-LOGGING"
+   ],
+   "note": "dynamic block"
+  },
+  {
+   "module": "s3",
+   "flag": "no_versioning",
+   "kind": "conditional",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.main",
+   "accept": [
+    "TF-AWS-S3-NO-VERSIONING"
+   ]
+  },
+  {
+   "module": "s3",
+   "flag": "website_enabled",
+   "kind": "none",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.main",
+   "accept": []
+  },
+  {
+   "module": "s3",
+   "flag": "s3_getobject_only",
+   "kind": "literal",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.getonly",
+   "accept": [
+    "TF-AWS-S3-POLICY-PUBLIC"
+   ],
+   "note": "policy comes from data.aws_iam_policy_document with identifiers [\"*\"], referenced as [0]"
+  },
+  {
+   "module": "s3",
+   "flag": "s3_public",
+   "kind": "literal",
+   "file": "modules/aws/s3/main.tf",
+   "resource": "aws_s3_bucket.public",
+   "accept": [
+    "TF-AWS-S3-POLICY-PUBLIC"
+   ],
+   "note": "same: data.aws_iam_policy_document, indexed reference"
+  },
+  {
+   "module": "ses",
+   "flag": "no_dkim_enabled",
+   "kind": "none",
+   "file": "modules/aws/ses/main.tf",
+   "resource": "aws_ses_domain_identity.main",
+   "accept": []
+  },
+  {
+   "module": "ses",
+   "flag": "identity_world_policy",
+   "kind": "none",
+   "file": "modules/aws/ses/main.tf",
+   "resource": "aws_ses_identity_policy.main",
+   "accept": []
+  },
+  {
+   "module": "sns",
+   "flag": "topic_world_policy",
+   "kind": "none",
+   "file": "modules/aws/sns/main.tf",
+   "resource": "aws_sns_topic_policy.main-policy",
+   "accept": []
+  },
+  {
+   "module": "sqs",
+   "flag": "queue_world_policy",
+   "kind": "none",
+   "file": "modules/aws/sqs/main.tf",
+   "resource": "aws_sqs_queue_policy.main",
+   "accept": []
+  },
+  {
+   "module": "sqs",
+   "flag": "sqs_server_side_encryption_disabled",
+   "kind": "none",
+   "file": "modules/aws/sqs/main.tf",
+   "resource": "aws_sqs_queue.main",
+   "accept": []
+  }
+ ],
+ "post_blind_note": "eval/results/sadcloud_blind_frozen.json holds the result at the frozen tag (18/23 in coverage). After that run, four gaps it exposed were fixed (indexed [0] references, data.aws_iam_policy_document principals, FTP/Telnet ports, confidence on conditional values) and the 'unresolved exposure' finding was added; eval/results/sadcloud.json is the post-fix result and is no longer blind."
+}

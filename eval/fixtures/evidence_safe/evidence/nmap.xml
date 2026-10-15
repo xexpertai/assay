@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV -oX nmap.xml 10.10.0.9" start="1760000000" version="7.94">
+  <host><status state="up"/><address addr="10.10.0.9" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="443"><state state="open"/><service name="https" product="nginx"/></port>
+      <port protocol="tcp" portid="22"><state state="filtered"/></port>
+    </ports>
+  </host>
+</nmaprun>

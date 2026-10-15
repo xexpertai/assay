@@ -1,0 +1,21 @@
+# Demo video: script and storyboard (target 2:40; produce only if the official format asks for a video)
+
+Status: **storyboard only, not rendered.** Rendering happens after the submission format is known (31 Oct). Before any cut is shown to Harsha it must pass the QA in CLAUDE.md rule 7: frames reviewed every 2 s at ≥ 1000 px wide, loudness −14 LUFS, true peak ≤ −1 dBTP, no silence > 0.6 s.
+
+Production notes
+- Voice: synthetic (Kokoro, af_heart) from `~/workspace/.video-venv`; subtitles burned in. Screen: a terminal at 1920×1080, 20 pt font, plus `report.html` in a plain browser window (no bookmarks bar, no third-party logos or product names on screen).
+- Every number on screen comes from a real run: `scripts/demo.sh` produces every terminal shot in order; `eval/results/SUMMARY.md` gives the figures for the last shot. Labels: the demo repo is a **Template** (fixture copy; all credentials are AWS documentation examples); the nmap file is a **Template** evidence file for a fictional lab address.
+- No invented user stories, no "customers", no third-party trademarks. Sample repositories are named with their licence.
+- Keep the last 30 s generic now; re-cut only that part during the event with the official problem.
+
+| # | Time | Screen (shot list) | Voice-over | Source of truth |
+|---|---|---|---|---|
+| 1 | 0:00–0:12 | Title card: "Assay: a security assessment agent that explains itself and asks before it acts". Sub-line: "offline · deterministic · MIT". | "Security scanners give you a long list. Assay gives you an assessment: what matters, why, and what to do next. And it changes nothing until a named person approves." | — |
+| 2 | 0:12–0:30 | Terminal: `assay scan https://example.com` → refusal message, exit code 2 shown with `echo $?`. | "First, safety. Assay only reviews local files you own or are licensed to test. Give it a URL, an IP address or a host and port, and it refuses before any work starts. Its default policy is files-only; a lab allowlist, signed off by a named owner with an expiry date, is the only way to bring hosts into scope." | demo.sh step 1 |
+| 3 | 0:30–0:55 | Terminal: `assay scan runs/demo/repo` output; then `report.html` scrolled to the **Agent decisions** table (plan rows: run/skip with reasons). | "Here it assesses a template repository: Terraform plus an nmap output file. It inventories the files, decides which analysers apply, and logs every run and every skip with a reason. The tool-output file is read as local evidence; nothing is executed." | demo.sh step 2; report.html |
+| 4 | 0:55–1:30 | `report.html` **Attack chains** card: the SVG diagram of the critical chain (SG open to the world → nmap saw 22/ssh open → AWS keys in user data). Zoom to the "Built from" IDs. | "Then it correlates. The configuration opens SSH to the internet. A scan file saw port 22 open on the lab host. The same instance's start-up script holds AWS keys. Three separate facts become one critical attack path, and every chain lists the finding IDs it was built from, so you can check each step." | chain C- from findings.json |
+| 5 | 1:30–1:50 | Terminal: `assay explain runs/demo/run C-…` full screen. | "One command explains any finding, chain or action: the rule, the evidence, the score derivation, the decision that ran the analyser, and the patch it proposes." | demo.sh step 3 |
+| 6 | 1:50–2:15 | Terminal: `assay apply` refused → `assay approve … --by "Demo Approver"` → `assay apply` applies one action → `assay verify-log` "intact and authenticated". | "Fixes are proposed as diffs. Applying without approval is refused. A named person approves one action; only that action is applied, and the audit log, keyed with a per-run secret, proves the order of events." | demo.sh steps 4–7 |
+| 7 | 2:15–2:40 | `eval/results/SUMMARY.md` on screen; the blind-sample line highlighted. | "Measured, not claimed. On a blind sample never seen while the rules were written, it found 18 of 23 weaknesses it had rules for; after fixing what that run exposed, all 23. TerraGoat 16 of 16, Kubernetes Goat 6 of 6, 16 of 16 safety checks. Open source, MIT, runs on a laptop with no cloud and no paid model." | eval/results/SUMMARY.md (update the spoken numbers if the summary changes) |
+
+Fallback for a "no video, deck instead" format: one slide per row above, same wording, same shots as screenshots.
