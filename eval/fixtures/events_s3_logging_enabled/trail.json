@@ -1,0 +1,27 @@
+{
+  "Records": [
+    {
+      "eventVersion": "1.08",
+      "userIdentity": {
+        "type": "IAMUser",
+        "arn": "arn:aws:iam::123456789012:user/jane-admin",
+        "userName": "jane-admin"
+      },
+      "eventTime": "2026-10-05T09:10:00Z",
+      "eventSource": "s3.amazonaws.com",
+      "eventName": "PutBucketLogging",
+      "sourceIPAddress": "10.0.4.17",
+      "requestParameters": {
+        "bucketName": "example-bucket",
+        "BucketLoggingStatus": {
+          "xmlns": "http://s3.amazonaws.com/doc/2006-03-01/",
+          "LoggingEnabled": {
+            "TargetBucket": "example-log-bucket",
+            "TargetPrefix": "example-bucket/"
+          }
+        },
+        "logging": ""
+      }
+    }
+  ]
+}

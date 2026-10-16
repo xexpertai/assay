@@ -20,6 +20,8 @@ def test_fixture_exact(case, tmp_path):
     assert {f.rule_id for f in findings} == set(spec["expect"])
     for rule, conf in spec.get("confidence", {}).items():  # e.g. non-literal CIDR expressions drop to medium
         assert {f.confidence for f in findings if f.rule_id == rule} == {conf}
+    if "max_chains" in spec:
+        assert len(run(str(dst)).chains) <= spec["max_chains"]
     for rule, sev in spec.get("severity", {}).items():  # e.g. a public policy demoted by the public access block
         assert {f.severity for f in findings if f.rule_id == rule} == {sev}
 

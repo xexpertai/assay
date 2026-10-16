@@ -35,19 +35,37 @@ LOGGING_OFF_ACTIONS = {"StopLogging", "DeleteTrail", "DeleteFlowLogs", "DisableK
 LOGGING_CONDITIONAL = {"PutBucketLogging", "UpdateTrail"}
 
 
+def _acts_on_other_user(actor: str, target: str | None) -> bool:
+    """True when the call names a different user than the caller (admin work), False for self or unknown."""
+    if not target:
+        return False
+    return target.rsplit("/", 1)[-1].lower() != actor.rsplit("/", 1)[-1].lower()
+
+
 def _disables_logging(act: str, raw: dict) -> bool:
     rp = _get(raw, "requestParameters")
     if not isinstance(rp, dict):
         return False  # no request body in this export: cannot tell, do not guess
     if act == "PutBucketLogging":
-        st = rp.get("bucketLoggingStatus")
-        return not (isinstance(st, dict) and st.get("LoggingEnabled"))
+        st = _ci(rp, "bucketLoggingStatus")
+        return not (isinstance(st, dict) and _ci(st, "LoggingEnabled"))
     if act == "UpdateTrail":
-        return rp.get("enableLogFileValidation") is False or rp.get("isMultiRegionTrail") is False
+        return _ci(rp, "enableLogFileValidation") is False or _ci(rp, "isMultiRegionTrail") is False
     return False
 KEY_ACTIONS = {"CreateAccessKey"}
 LOGIN_ACTIONS = {"ConsoleLogin", "login", "Login", "sshd:auth", "authentication"}
 FAIL_RE = re.compile(r"(?i)fail|denied|invalid|unauthori[sz]ed|AccessDenied|incorrect")
+
+
+def _ci(d: dict, key: str):
+    """Dict lookup that tolerates key-case differences (real CloudTrail mixes bucketName / BucketLoggingStatus)."""
+    if key in d:
+        return d[key]
+    low = key.lower()
+    for k, v in d.items():
+        if isinstance(k, str) and k.lower() == low:
+            return v
+    return None
 
 
 def _get(d: dict, dotted: str):
@@ -55,7 +73,7 @@ def _get(d: dict, dotted: str):
     for part in dotted.split("."):
         if not isinstance(cur, dict):
             return None
-        cur = cur.get(part)
+        cur = _ci(cur, part)
     return cur
 
 
@@ -89,29 +107,84 @@ SSHD_RE = re.compile(
     r"(?P<msg>(?:Failed|Accepted)\s+\S+\s+for\s+(?:invalid user\s+)?(?P<user>\S+)\s+from\s+(?P<ip>[0-9a-fA-F:.]+)\b.*"
     r"|Invalid user\s+(?P<user2>\S+)\s+from\s+(?P<ip2>[0-9a-fA-F:.]+)\b.*)$")
 MONTHS = {m: i for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
-SYSLOG_YEAR = 1970  # classic syslog lines carry no year: times are only comparable inside one file
+SYSLOG_YEAR = 1970  # classic syslog lines carry no year; without a reference time only relative times are valid
+SYS_TS = r"(?P<ts>(?:\d{4}-\d{2}-\d{2}T\S+)|(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}))"
+SUDO_RE = re.compile(SYS_TS + r"\s+\S+\s+sudo(?:\[\d+\])?:\s+(?P<user>\S+)\s+:.*?COMMAND=(?P<cmd>.*)$")
+USERADD_RE = re.compile(SYS_TS + r"\s+\S+\s+useradd(?:\[\d+\])?:\s+new user:\s+name=(?P<name>[^,\s]+)")
+GROUPADD_RE = re.compile(SYS_TS + r"\s+\S+\s+(?:usermod|gpasswd)(?:\[\d+\])?:\s+add '?(?P<name>[^' ]+)'? to (?:shadow )?group '?(?P<group>[^' ]+)'?")
+PRIV_GROUPS = {"sudo", "wheel", "admin", "root", "adm"}
+PERSIST_CMD_RE = re.compile(r"authorized_keys|crontab|/etc/sudoers|visudo|systemctl\s+(?:enable|edit)|chmod\s+[ugo]*\+s|"
+                            r"\b(?:useradd|adduser|usermod|gpasswd)\b")
+SESSION_WINDOW_S = 3600
 
 
-def _syslog_time(ts: str) -> str:
+def _syslog_time(ts: str, ref: datetime | None = None) -> str:
+    """ISO time for a syslog stamp. `ref` (the file's modification time) supplies the missing year; a stamp that
+    would land in the future relative to `ref` belongs to the previous year (a log read just after New Year)."""
     if ts[:4].isdigit():
         return ts
     mon, day, hms = ts.split()[0], int(ts.split()[1]), ts.split()[2]
-    return f"{SYSLOG_YEAR}-{MONTHS[mon]:02d}-{day:02d}T{hms}+00:00"
+    year = ref.year if ref else SYSLOG_YEAR
+    try:
+        t = datetime.fromisoformat(f"{year}-{MONTHS[mon]:02d}-{day:02d}T{hms}+00:00")
+    except ValueError:  # 29 Feb in a non-leap reference year
+        return f"{SYSLOG_YEAR}-{MONTHS[mon]:02d}-{day:02d}T{hms}+00:00"
+    if ref and (t - ref).total_seconds() > 86400:
+        t = t.replace(year=year - 1)
+    return t.isoformat()
 
 
-def parse_sshd(text: str) -> list[tuple[int, dict]]:
-    """(line_no, event) for sshd lines of a syslog-style auth.log: failed/accepted logins and invalid users."""
+def parse_sshd(text: str, ref: datetime | None = None) -> list[tuple[int, dict]]:
+    """(line_no, event) for syslog-style auth.log lines: sshd failed/accepted logins and invalid users, plus
+    host persistence signals (sudo commands, useradd, adding a user to a privileged group). Persistence events are
+    attributed to the sudo user, else to the most recent accepted login within the last hour."""
     out = []
-    for i, line in enumerate(text.splitlines(), 1):
-        m = SSHD_RE.match(line.strip())
-        if not m:
+    session: dict[str, str] = {}  # user -> source ip of their latest accepted login
+    last_login: tuple[datetime | None, str, str] = (None, "", "")  # time, user, ip
+    last_sudo: tuple[datetime | None, str] = (None, "")
+
+    def actor_near(t: datetime | None) -> tuple[str, str]:
+        if last_sudo[0] and t and 0 <= (t - last_sudo[0]).total_seconds() <= 60:
+            return last_sudo[1], session.get(last_sudo[1], "")
+        if last_login[0] and t and 0 <= (t - last_login[0]).total_seconds() <= SESSION_WINDOW_S:
+            return last_login[1], last_login[2]
+        return "unknown", ""
+
+    for i, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        m = SSHD_RE.match(line)
+        if m:
+            msg = m.group("msg")
+            user = m.group("user") or m.group("user2")
+            ip = m.group("ip") or m.group("ip2")
+            iso = _syslog_time(m.group("ts"), ref)
+            out.append((i, {"timestamp": iso, "user": user, "action": "sshd:auth", "src_ip": ip,
+                            "status": msg.split(" for ")[0].split(" from ")[0], "mfa": "n/a"}))
+            if msg.startswith("Accepted"):
+                session[user] = ip
+                last_login = (_parse_time(iso), user, ip)
             continue
-        msg = m.group("msg")
-        user = m.group("user") or m.group("user2")
-        ip = m.group("ip") or m.group("ip2")
-        out.append((i, {"timestamp": _syslog_time(m.group("ts")), "user": user, "action": "sshd:auth",
-                        "src_ip": ip, "status": msg.split(" for ")[0].split(" from ")[0],
-                        "mfa": "n/a"}))
+        m = SUDO_RE.match(line)
+        if m:
+            iso = _syslog_time(m.group("ts"), ref)
+            user, cmd = m.group("user"), m.group("cmd").strip()
+            last_sudo = (_parse_time(iso), user)
+            # commands that the daemon logs itself (useradd, usermod, gpasswd) are reported from those lines
+            if PERSIST_CMD_RE.search(cmd) and not re.search(r"\b(?:useradd|adduser|usermod|gpasswd)\b", cmd):
+                out.append((i, {"timestamp": iso, "user": user, "action": "sudo:command", "src_ip": session.get(user, ""),
+                                "status": "ok", "target": cmd[:120]}))
+            continue
+        for rx, action in ((USERADD_RE, "useradd"), (GROUPADD_RE, "group-add")):
+            m = rx.match(line)
+            if m:
+                iso = _syslog_time(m.group("ts"), ref)
+                if action == "group-add" and m.group("group") not in PRIV_GROUPS:
+                    break
+                who, ip = actor_near(_parse_time(iso))
+                tgt = m.group("name") + (f" -> {m.group('group')}" if action == "group-add" else "")
+                out.append((i, {"timestamp": iso, "user": who, "action": action, "src_ip": ip, "status": "ok",
+                                "target": tgt}))
+                break
     return out
 
 
@@ -136,6 +209,7 @@ def _records(text: str) -> list[tuple[int, dict]] | None:
     if m:
         dec = json.JSONDecoder()
         idx = m.end()
+        line, last = 1 + text.count("\n", 0, idx), idx  # count newlines incrementally: O(n), not O(n^2)
         while True:
             while idx < len(text) and text[idx] in " \t\r\n,":
                 idx += 1
@@ -146,12 +220,14 @@ def _records(text: str) -> list[tuple[int, dict]] | None:
             except json.JSONDecodeError:
                 break
             if isinstance(obj, dict):
-                out.append((text.count("\n", 0, idx) + 1, obj))
+                line += text.count("\n", last, idx)
+                last = idx
+                out.append((line, obj))
             idx = nxt
     return out
 
 
-def load_events(text: str) -> list[tuple[int, dict]]:
+def load_events(text: str, ref: datetime | None = None) -> list[tuple[int, dict]]:
     """(line_no, raw_event) from a JSON document (Records/events/items or a bare array; pretty-printed or not),
     JSONL, a syslog-style sshd auth.log, or CSV with a header."""
     t = text.lstrip()
@@ -168,7 +244,7 @@ def load_events(text: str) -> list[tuple[int, dict]]:
                 except json.JSONDecodeError:
                     continue
         return out
-    ssh = parse_sshd(text)
+    ssh = parse_sshd(text, ref)
     if ssh:
         return ssh
     try:
@@ -299,23 +375,55 @@ def analyse_events(rel: str, events: list[tuple[int, dict]], mapping: dict | Non
                           remediation="Enforce MFA for every console user; never use the root user day to day.",
                           cwe="CWE-308", category="auth_no_mfa", tags=["observed", "event"],
                           meta={**ctx(n), "actor": actor, "key": f"{actor}|{ln}"}))
+        other = _acts_on_other_user(actor, n.get("target"))
         if act in PRIV_ESC_ACTIONS and not FAIL_RE.search(n.get("outcome") or ""):
             out.append(mk(ln, resource=f"actor/{actor}", rule_id="EVT-PRIV-ESC",
-                          title=f"Privilege change: {act} by {actor}", severity="high", confidence="medium",
+                          title=(f"Admin activity: {act} on {n.get('target')} by {actor} (review)" if other
+                                 else f"Privilege change: {act} by {actor}"),
+                          severity="medium" if other else "high", confidence="medium",
                           evidence=f"{act} on {n.get('target') or '?'} from {n.get('source_ip') or '?'}",
-                          rationale="Policy and login-profile changes are how an intruder turns a foothold into "
-                                    "persistent admin access; each one needs a known change ticket.",
+                          rationale=("An identity changed ANOTHER user's permissions. That is normal onboarding work "
+                                     "and is only an intrusion signal when something suspicious came first."
+                                     if other else
+                                     "Policy and login-profile changes are how an intruder turns a foothold into "
+                                     "persistent admin access; each one needs a known change ticket."),
                           remediation="Match against approved changes; revert and rotate if unexplained.",
-                          cwe="CWE-269", category="priv_change", tags=["observed", "event"],
-                          meta={**ctx(n), "actor": actor, "action": act, "key": f"{act}|{ln}"}))
+                          cwe="CWE-269", category="priv_change",
+                          tags=["observed", "event"] + (["admin-activity"] if other else []),
+                          meta={**ctx(n), "actor": actor, "action": act, "other_user": other,
+                                "key": f"{act}|{ln}"}))
         if act in KEY_ACTIONS and not FAIL_RE.search(n.get("outcome") or ""):
             out.append(mk(ln, resource=f"actor/{actor}", rule_id="EVT-NEW-ACCESS-KEY",
-                          title=f"Long-lived access key created by {actor}", severity="medium", confidence="high",
+                          title=(f"Admin activity: access key created for {n.get('target')} by {actor} (review)"
+                                 if other else f"Long-lived access key created by {actor}"),
+                          severity="low" if other else "medium", confidence="high",
                           evidence=f"{act} for {n.get('target') or actor}",
-                          rationale="New static keys are a common persistence step and leak easily.",
+                          rationale="New static keys are a common persistence step and leak easily."
+                                    + (" Created for another user, which is routine in onboarding; review it." if other
+                                       else ""),
                           remediation="Confirm the key is expected; prefer roles and short-lived credentials.",
-                          cwe="CWE-798", category="iam_static_key", tags=["observed", "event"],
-                          meta={**ctx(n), "actor": actor, "key": f"{act}|{ln}"}))
+                          cwe="CWE-798", category="iam_static_key",
+                          tags=["observed", "event"] + (["admin-activity"] if other else []),
+                          meta={**ctx(n), "actor": actor, "other_user": other, "key": f"{act}|{ln}"}))
+        if act in ("sudo:command", "useradd", "group-add"):
+            after_bf = any(f.rule_id == "EVT-BRUTE-FORCE-SUCCESS" and f.meta.get("time", "") <= (n.get("time") or "")
+                           for f in out)
+            what = {"sudo:command": "persistence command", "useradd": "new local account",
+                    "group-add": "privileged group membership"}[act]
+            out.append(mk(ln, resource=f"actor/{actor}", rule_id="EVT-HOST-PERSISTENCE",
+                          title=(f"Host persistence after a successful brute force: {what} ({n.get('target')}) by {actor}"
+                                 if after_bf else f"Admin activity: {what} ({n.get('target')}) by {actor} (review)"),
+                          severity="high" if after_bf else "medium", confidence="medium",
+                          evidence=f"{act}: {n.get('target')} from {n.get('source_ip') or 'local session'}",
+                          rationale="New accounts, sudo group membership, authorized_keys, cron and sudoers edits are how "
+                                    "an intruder keeps access after the password is changed."
+                                    + ("" if after_bf else " On its own this is routine admin work; it only becomes an "
+                                                           "intrusion signal after a suspicious login."),
+                          remediation="Match against a change ticket; if unexplained, remove the account/key, rotate "
+                                      "credentials and review the session.",
+                          cwe="CWE-912" if after_bf else "CWE-269", category="host_persistence",
+                          tags=["observed", "event"] + ([] if after_bf else ["admin-activity"]),
+                          meta={**ctx(n), "actor": actor, "other_user": not after_bf, "key": f"{act}|{ln}"}))
         if (act in LOGGING_OFF_ACTIONS or (act in LOGGING_CONDITIONAL and _disables_logging(act, raw))) \
                 and not FAIL_RE.search(n.get("outcome") or ""):
             out.append(mk(ln, resource=f"actor/{actor}", rule_id="EVT-LOGGING-OFF",
@@ -328,11 +436,23 @@ def analyse_events(rel: str, events: list[tuple[int, dict]], mapping: dict | Non
     return out
 
 
+def _mtime(facts, rel: str) -> datetime | None:
+    root = getattr(facts, "root", None)
+    try:
+        return datetime.fromtimestamp((root / rel).stat().st_mtime, tz=timezone.utc) if root else None
+    except OSError:
+        return None
+
+
 def analyse(files: list[tuple[str, str]], facts) -> list[Finding]:
     out: list[Finding] = []
     for rel, txt in files:
-        evs = load_events(txt)
+        ref = _mtime(facts, rel)
+        evs = load_events(txt, ref)
         if evs:
+            if ref and parse_sshd(txt[:200000]):
+                facts.notes.append((rel, f"syslog lines carry no year; {ref.year} was taken from the file's "
+                                         "modification time (a stamp later than that is placed in the previous year)"))
             out += analyse_events(rel, evs)
             for _, n, _ in [(ln, normalise(r), r) for ln, r in evs]:
                 if n.get("actor"):

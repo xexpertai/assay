@@ -1062,6 +1062,6 @@
     "One credential appears in 2 places",
     "Publicly reachable data store aws_s3_bucket.public lacks protection or audit trail"
   ],
-  "wall_s": 0.26,
+  "wall_s": 0.15,
   "files": 82
 }

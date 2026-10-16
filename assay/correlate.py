@@ -32,6 +32,8 @@ class Facts:
     iam_names: dict[str, str] = field(default_factory=dict)  # aws_iam_user/role address -> literal name
     specific_secret_lines: set[tuple[str, int]] = field(default_factory=set)
     policy: object = None  # ScopePolicy; set by the agent
+    root: object = None  # scan root Path, so analysers can read file times
+    notes: list[tuple[str, str]] = field(default_factory=list)  # (file, note) assumptions an analyser made
 
 
 def _chain_id(kind: str, ids: list[str]) -> str:

@@ -19,7 +19,7 @@ Fill `templates/event-repo/STATEMENT-MAP.md`: every requirement → exists (file
 
 ## Theme sketches (what exists, what to build first)
 - **Lab recon and assessment:** lab.json → `assay step plan` / `approve` / `run` (see `scripts/demo-lab.sh`; approval is bound to the exact command and logged) → `CommandRunner` profiles for the allowed tools → evidence files → `NMAP-*`/`NUCLEI-*` findings → confirmed-exposure chains → `explain`. Build first: profiles and the lab file; never a host outside the allowlist.
-- **Cloud / IaC posture:** existing 86 rules; build first: whatever resource types the statement names (reuse `_principal_any`, `_unsure`, companions).
+- **Cloud / IaC posture:** existing 87 rules; build first: whatever resource types the statement names (reuse `_principal_any`, `_unsure`, companions).
 - **Log / event analysis:** `events.py` with a `mapping` for the given schema; build first: the mapping and the one or two rules the statement stresses; actor chains and the log-actor to IAM match already exist in `correlate_events.py`; extend `STAGE` for new categories.
 - **DataOps pipeline configs (Airflow, dbt, Kafka, SQL grants):** new analyser kind + rules (connections with passwords, `GRANT ALL`, public topics, unmasked PII); the secrets scan already covers any text.
 - **Kubernetes lab export:** `kubectl get -o yaml` is `kind: List`, already ingested; build first: runtime facts if provided.

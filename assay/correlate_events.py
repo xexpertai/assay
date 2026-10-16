@@ -13,7 +13,17 @@ from datetime import datetime
 from .models import Chain, Finding
 
 STAGE = {"auth_bruteforce": "access", "auth_bruteforce_success": "access", "auth_no_mfa": "access",
-         "priv_change": "privilege escalation", "iam_static_key": "persistence", "logging_off": "defence evasion"}
+         "priv_change": "privilege escalation", "iam_static_key": "persistence", "host_persistence": "persistence", "logging_off": "defence evasion"}
+# A sequence is an intrusion only if something suspicious comes first: a failure burst, a success after failures,
+# a login without MFA, logging switched off, or a privilege change an identity made on ITSELF. Actions on another
+# user (onboarding) are admin activity and never start a chain on their own.
+ANCHOR_CATS = {"auth_bruteforce", "auth_bruteforce_success", "auth_no_mfa", "logging_off"}
+
+
+def is_anchor(f: Finding) -> bool:
+    return f.category in ANCHOR_CATS or (f.category in ("priv_change", "iam_static_key", "host_persistence") and not f.meta.get("other_user"))
+
+
 STAGE_ORDER = ["access", "privilege escalation", "persistence", "defence evasion"]
 CLUSTER_GAP_S = 3600  # events of one intrusion are at most an hour apart
 
@@ -83,6 +93,10 @@ def _timeline(fs: list[Finding]) -> str:
 def _kill_chains(evt: list[Finding]) -> list[Chain]:
     out = []
     for cl in _clusters(evt):
+        first = next((i for i, f in enumerate(cl) if is_anchor(f)), None)
+        if first is None:
+            continue  # no suspicious signal: routine activity, not an intrusion
+        cl = cl[first:]  # only what happens from the first suspicious signal onwards belongs to the story
         stages = {STAGE[f.category] for f in cl if f.category in STAGE}
         if len(stages) < 2 or len(cl) < 2:
             continue
@@ -129,7 +143,7 @@ def _actor_iam_chains(evt: list[Finding], findings: list[Finding], facts) -> lis
     iam = [f for f in findings if f.category == "iam_wildcard" and f.rule_id.startswith("TF-")]
     for f in iam:
         for name, addr in _iam_identities(f, facts).items():
-            hits = [e for e in evt if actor_key(e.meta.get("actor", "")) == name]
+            hits = [e for e in evt if actor_key(e.meta.get("actor", "")) == name and "admin-activity" not in e.tags]
             if not hits:
                 continue
             ids = [f.id] + [e.id for e in hits]

@@ -205,6 +205,21 @@
       "missed": []
     },
     {
+      "case": "events_admin_onboarding",
+      "safe_case": false,
+      "expected": [
+        "EVT-NEW-ACCESS-KEY",
+        "EVT-PRIV-ESC"
+      ],
+      "got": [
+        "EVT-NEW-ACCESS-KEY",
+        "EVT-PRIV-ESC"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "events_cloudtrail",
       "safe_case": false,
       "expected": [
@@ -223,6 +238,15 @@
         "EVT-NEW-ACCESS-KEY",
         "EVT-PRIV-ESC"
       ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "events_s3_logging_enabled",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
       "pass": true,
       "false_positives": [],
       "missed": []
@@ -957,14 +981,14 @@
       "missed": []
     }
   ],
-  "n_cases": 70,
-  "passed": 70,
-  "rule_hits_tp": 113,
+  "n_cases": 72,
+  "passed": 72,
+  "rule_hits_tp": 115,
   "rule_hits_fp": 0,
   "rule_hits_fn": 0,
   "precision": 1.0,
   "recall": 1.0,
-  "safe_cases": 23,
-  "safe_cases_clean": 23,
+  "safe_cases": 24,
+  "safe_cases_clean": 24,
   "errors": {}
 }

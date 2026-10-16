@@ -1,0 +1,64 @@
+{
+  "Records": [
+    {
+      "eventTime": "2026-10-05T09:00:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/jane-admin"
+      },
+      "sourceIPAddress": "10.0.4.17",
+      "responseElements": {
+        "ConsoleLogin": "Success"
+      },
+      "additionalEventData": {
+        "MFAUsed": "Yes"
+      }
+    },
+    {
+      "eventTime": "2026-10-05T09:02:00Z",
+      "eventName": "CreateUser",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/jane-admin"
+      },
+      "sourceIPAddress": "10.0.4.17",
+      "requestParameters": {
+        "userName": "bob-new"
+      }
+    },
+    {
+      "eventTime": "2026-10-05T09:03:00Z",
+      "eventName": "AddUserToGroup",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/jane-admin"
+      },
+      "sourceIPAddress": "10.0.4.17",
+      "requestParameters": {
+        "userName": "bob-new",
+        "groupName": "developers"
+      }
+    },
+    {
+      "eventTime": "2026-10-05T09:04:00Z",
+      "eventName": "CreateLoginProfile",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/jane-admin"
+      },
+      "sourceIPAddress": "10.0.4.17",
+      "requestParameters": {
+        "userName": "bob-new",
+        "passwordResetRequired": true
+      }
+    },
+    {
+      "eventTime": "2026-10-05T09:05:00Z",
+      "eventName": "CreateAccessKey",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/jane-admin"
+      },
+      "sourceIPAddress": "10.0.4.17",
+      "requestParameters": {
+        "userName": "bob-new"
+      }
+    }
+  ]
+}

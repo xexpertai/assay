@@ -28,6 +28,8 @@ HOSTPORT_RE = re.compile(r"^[\w.-]+:\d+$")
 
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".terraform", "dist", "build"}
 MAX_FILE_BYTES = 1_000_000
+EVENT_FILE_BYTES = 32_000_000  # event-log-looking files (json/jsonl/csv/log, optionally .gz) get a larger default cap
+EVENT_NAME_SUFFIXES = (".json", ".jsonl", ".ndjson", ".csv", ".log", ".gz")
 
 
 class ScopeError(ValueError):
@@ -47,9 +49,10 @@ def _looks_like_network_target(target: str) -> bool:
 @dataclass(frozen=True)
 class Scope:
     root: Path
+    max_bytes: int | None = None  # --max-bytes: one cap for every file; None = 1 MB, 32 MB for event-log-looking names
 
     @classmethod
-    def from_target(cls, target: str) -> "Scope":
+    def from_target(cls, target: str, max_bytes: int | None = None) -> "Scope":
         if _looks_like_network_target(target):
             raise ScopeError(
                 f"refused: '{target}' looks like a network target. Assay only reviews local files "
@@ -58,7 +61,7 @@ class Scope:
         root = Path(target).expanduser().resolve()
         if not root.is_dir():
             raise ScopeError(f"refused: '{target}' is not a local directory")
-        return cls(root)
+        return cls(root, max_bytes)
 
     def contains(self, path: Path) -> bool:
         try:
@@ -66,6 +69,11 @@ class Scope:
             return True
         except ValueError:
             return False
+
+    def cap_for(self, name: str) -> int:
+        if self.max_bytes:
+            return self.max_bytes
+        return EVENT_FILE_BYTES if name.lower().endswith(EVENT_NAME_SUFFIXES) else MAX_FILE_BYTES
 
     def files(self, skipped: list | None = None):
         """Yield in-scope regular files (no symlinks escaping the root, no huge files).
@@ -79,10 +87,11 @@ class Scope:
                     continue
                 if not p.is_file() or not self.contains(p):
                     continue
-                if p.stat().st_size > MAX_FILE_BYTES:
+                cap = self.cap_for(p.name)
+                if p.stat().st_size > cap:
                     if skipped is not None:
                         skipped.append((p.relative_to(self.root).as_posix(),
-                                        f"{p.stat().st_size} bytes is over the {MAX_FILE_BYTES} byte file cap"))
+                                        f"{p.stat().st_size} bytes is over the {cap} byte file cap (raise it with --max-bytes)"))
                     continue
                 yield p
 

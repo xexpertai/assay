@@ -68,6 +68,49 @@ def test_unparseable_event_log_is_a_logged_skip_not_silence(tmp_path):
 
 
 def test_oversize_file_skip_is_logged(tmp_path):
-    (tmp_path / "huge.log").write_text("x" * 1_100_000)
+    (tmp_path / "huge.log").write_text("x" * 5000)
+    res = run(str(tmp_path), max_bytes=1000)
+    assert any(d.action == "skipped huge.log" and "--max-bytes" in d.reason for d in res.decisions)
+    assert not any(d.action == "skipped huge.log" for d in run(str(tmp_path)).decisions)  # default cap is larger
+
+
+def test_cloudtrail_json_gz_is_read(tmp_path):
+    import gzip
+    with gzip.open(tmp_path / "123456789012_CloudTrail_us-east-1_20261002T1015Z_abc.json.gz", "wt") as fh:
+        json.dump(_trail(50), fh)
     res = run(str(tmp_path))
-    assert any(d.action == "skipped huge.log" for d in res.decisions)
+    assert "EVT-BRUTE-FORCE-SUCCESS" in {f.rule_id for f in res.findings}
+
+
+def test_gz_edge_cases_are_logged_not_silent(tmp_path):
+    import gzip
+    (tmp_path / "corrupt.json.gz").write_bytes(b"\x1f\x8b not really gzip")
+    (tmp_path / "notes.txt.gz").write_bytes(gzip.compress(b"hello"))
+    (tmp_path / "logs.tar.gz").write_bytes(gzip.compress(b"x" * 100))
+    (tmp_path / "old.zip").write_bytes(b"PK\x03\x04")
+    with gzip.open(tmp_path / "bomb.json.gz", "wt") as fh:
+        fh.write(" " * 3_000_000)
+    res = run(str(tmp_path), max_bytes=1_000_000)
+    acts = {d.action: d.reason for d in res.decisions if d.stage == "recon"}
+    assert "not a readable gzip" in acts["skipped corrupt.json.gz"]
+    assert "uncompressed content is over" in acts["skipped bomb.json.gz"]
+    for n in ("notes.txt.gz", "logs.tar.gz", "old.zip"):
+        assert any(a.startswith(f"skipped {n}: compressed file") for a in acts), n
+
+
+def test_case_insensitive_keys_and_real_putbucketlogging_shape(tmp_path):
+    rec = lambda rp: {"eventTime": "2026-10-05T09:00:00Z", "EventName": "PutBucketLogging",
+                      "UserIdentity": {"Arn": "arn:aws:iam::1:user/a"}, "SourceIPAddress": "10.0.0.1", "requestParameters": rp}
+    on = {"bucketName": "b", "BucketLoggingStatus": {"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/",
+                                                     "LoggingEnabled": {"TargetBucket": "logs", "TargetPrefix": "b/"}}}
+    off = {"bucketName": "b", "BucketLoggingStatus": {"xmlns": "http://s3.amazonaws.com/doc/2006-03-01/"}}
+    (tmp_path / "t.json").write_text(json.dumps({"Records": [rec(on)]}))
+    assert not [f for f in run(str(tmp_path)).findings if f.rule_id == "EVT-LOGGING-OFF"]
+    (tmp_path / "t.json").write_text(json.dumps({"Records": [rec(off)]}))
+    assert [f for f in run(str(tmp_path)).findings if f.rule_id == "EVT-LOGGING-OFF"]
+
+
+def test_multi_megabyte_trail_is_read_by_default(tmp_path):
+    (tmp_path / "trail.json").write_text(json.dumps(_trail(12000), indent=1))
+    assert (tmp_path / "trail.json").stat().st_size > 3_000_000
+    assert "EVT-BRUTE-FORCE-SUCCESS" in {f.rule_id for f in run(str(tmp_path)).findings}

@@ -8,6 +8,7 @@ from .models import Artifact
 from .rules.dataops import kind_of as dataops_kind
 from .rules.events import kind_of as event_kind, looks_like_unparsed_events
 from .rules.toolout import kind_of as tool_kind
+from .fileio import Unreadable, inner_name, is_other_compressed, read_text
 from .scope import Scope
 
 K8S_RE = re.compile(r"^\s*apiVersion:\s*\S+", re.M)
@@ -15,7 +16,7 @@ K8S_KIND_RE = re.compile(r"^\s*kind:\s*\S+", re.M)
 
 
 def classify(path: Path, head: str, full: str | None = None) -> str:
-    name = path.name.lower()
+    name = inner_name(path.name.lower())
     parts = [p.lower() for p in path.parts]
     tool = tool_kind(name, head) or event_kind(name, head, full) or dataops_kind(name, head)
     if tool:
@@ -46,9 +47,19 @@ def classify(path: Path, head: str, full: str | None = None) -> str:
 def build_inventory(scope: Scope, skipped: list | None = None) -> list[Artifact]:
     out: list[Artifact] = []
     for p in scope.files(skipped=skipped):
+        if is_other_compressed(p.name):
+            out.append(Artifact(scope.rel(p), "compressed-skipped", p.stat().st_size))
+            continue
         try:
-            full = p.read_text(encoding="utf-8", errors="ignore")  # files are capped at 1 MB by the scope
+            full = read_text(p, scope.cap_for(p.name), errors="ignore")
+        except Unreadable as e:
+            if skipped is not None:
+                skipped.append((scope.rel(p), str(e)))
+            continue
         except OSError:
             continue
-        out.append(Artifact(scope.rel(p), classify(p, full[:4000], full), p.stat().st_size))
+        kind = classify(p, full[:4000], full)
+        if p.name.lower().endswith(".gz") and kind == "other":
+            kind = "compressed-skipped"  # a gzip file that is not an event log: not understood, logged by the agent
+        out.append(Artifact(scope.rel(p), kind, p.stat().st_size))
     return out

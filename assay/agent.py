@@ -14,6 +14,7 @@ from pathlib import Path
 from . import __version__
 from .actions import AuditLog, plan_hash, propose
 from .correlate import Facts, correlate, prioritise
+from .fileio import Unreadable, read_text
 from .inventory import build_inventory
 from .models import Chain, Decision, Finding
 from .planner import order_analysers, propose_steps
@@ -46,12 +47,12 @@ class Result:
 
 def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url: str | None = None,
         max_files: int = 5000, policy: ScopePolicy | None = None, baseline: Path | None = None,
-        planner_url: str | None = None) -> Result:
+        planner_url: str | None = None, max_bytes: int | None = None) -> Result:
     from .baseline import diff as diff_findings, load_baseline
     t0 = time.perf_counter()
     base_data = load_baseline(baseline) if baseline else None  # fail early, before any work
     decisions: list[Decision] = []
-    scope = Scope.from_target(target)  # raises on network targets
+    scope = Scope.from_target(target, max_bytes)  # raises on network targets
     policy = policy or ScopePolicy.files_only()
     log = None
     if out_dir:
@@ -78,6 +79,10 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
         inv = inv[:max_files]
     kinds = Counter(a.kind for a in inv)
     for a in inv:
+        if a.kind == "compressed-skipped":
+            decisions.append(Decision("recon", f"skipped {a.path}: compressed file, content not analysed",
+                                      "only gzip event logs (CloudTrail .json.gz) are unpacked; other archives are "
+                                      "not opened. Extract them first if they hold logs or configuration."))
         if a.kind == "eventlog-unparsed":
             decisions.append(Decision("recon", f"skipped {a.path}: looks like an event log but could not be parsed",
                                       "the name and vocabulary suggest CloudTrail/auth events, but no record with a time "
@@ -101,13 +106,13 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
         p = scope.root / a.path
         if a.kind in TEXT_KINDS and (a.kind != "other" or p.suffix.lower() in TEXT_SUFFIXES):
             try:
-                texts[a.path] = p.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
+                texts[a.path] = read_text(p, scope.cap_for(p.name))
+            except (UnicodeDecodeError, OSError, Unreadable):
                 continue
 
     # ---- analyse
     findings: list[Finding] = []
-    facts = Facts(policy=policy)
+    facts = Facts(policy=policy, root=scope.root)
     by_kind: dict[str, list[tuple[str, str]]] = {}
     for a in inv:
         if a.path in texts:
@@ -125,6 +130,8 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
         ran += 1
     for rel, host, why in facts.dropped:
         decisions.append(Decision("analyse", f"ignored evidence about {host} in {rel}", why))
+    for rel, note in facts.notes:
+        decisions.append(Decision("analyse", f"assumption for {rel}", note))
     for rel, why in facts.skipped:
         decisions.append(Decision("analyse", f"skipped part of {rel}", why))
     # de-duplicate by id

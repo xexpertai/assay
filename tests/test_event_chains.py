@@ -92,3 +92,37 @@ def test_safe_dataops_files_make_no_chain(tmp_path):
     (tmp_path / "airflow.cfg").write_text("[api]\nauth_backends = airflow.api.auth.backend.basic_auth\n")
     (tmp_path / "server.properties").write_text("listeners=SASL_SSL://0.0.0.0:9093\nauthorizer.class.name=kafka.security.authorizer.AclAuthorizer\nbroker.id=1\n")
     assert not run(str(tmp_path)).chains
+
+
+def _r(t, name, who="mallory", rp=None, **kw):
+    x = {"eventTime": f"2026-10-05T{t}Z", "eventName": name, "userIdentity": {"arn": f"arn:aws:iam::1:user/{who}"},
+         "sourceIPAddress": "10.0.4.17"}
+    if rp:
+        x["requestParameters"] = rp
+    x.update(kw)
+    return x
+
+
+def test_self_escalation_is_an_anchor_but_admin_work_on_others_is_not(tmp_path):
+    (tmp_path / "t.json").write_text(json.dumps({"Records": [
+        _r("09:00:00", "AttachUserPolicy", rp={"userName": "mallory"}),   # on herself: suspicious first
+        _r("09:01:00", "StopLogging")]}))
+    assert len(run(str(tmp_path)).chains) == 1
+    d2 = tmp_path / "b"
+    d2.mkdir()
+    (d2 / "t.json").write_text(json.dumps({"Records": [
+        _r("09:00:00", "AttachUserPolicy", who="jane", rp={"userName": "bob"}),
+        _r("09:01:00", "CreateAccessKey", who="jane", rp={"userName": "bob"})]}))
+    res = run(str(d2))
+    assert not res.chains and {f.severity for f in res.findings} == {"medium", "low"}
+    assert all("admin-activity" in f.tags for f in res.findings)
+
+
+def test_admin_activity_after_a_failure_burst_is_still_part_of_the_intrusion(tmp_path):
+    t = _trail(0)
+    t["Records"] += [_r("10:09:00", "AttachUserPolicy", who="alice", rp={"userName": "bob"},
+                        sourceIPAddress="203.0.113.9") for _ in range(1)]
+    t["Records"][-1]["sourceIPAddress"] = "203.0.113.9"
+    t["Records"][-1]["eventTime"] = "2026-10-02T10:09:00Z"
+    (tmp_path / "t.json").write_text(json.dumps(t))
+    assert any(c.title.startswith("Brute force succeeded, then privilege escalation") for c in run(str(tmp_path)).chains)

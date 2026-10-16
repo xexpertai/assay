@@ -22,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--out", default="runs/latest")
     s.add_argument("--llm", action="store_true", help="ask a local llama.cpp server for the briefing")
     s.add_argument("--llm-url", default=None)
+    s.add_argument("--max-bytes", type=int, default=None, metavar="N",
+                   help="per-file size cap in bytes, also applied to decompressed .gz content "
+                        "(default 1000000; 32000000 for log-looking files)")
     s.add_argument("--llm-plan", action="store_true",
                    help="let a local llama.cpp model order the analysers and propose follow-up active steps "
                         "(validated; steps are only planned, a named human still approves them)")
@@ -74,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
             policy = ScopePolicy.from_lab_file(args.lab) if args.lab else ScopePolicy.files_only()
             res = run(args.target, Path(args.out), use_llm=args.llm, llm_url=args.llm_url, policy=policy,
                       baseline=Path(args.baseline) if args.baseline else None,
+                      max_bytes=args.max_bytes,
                       planner_url=(args.llm_url or os.environ.get("ASSAY_LLM_URL", "http://127.0.0.1:8088")) if args.llm_plan else None)
             c = res.counts
             print(f"Assay: {c['findings']} findings, {c['chains']} chains, {len(res.actions)} proposed actions "

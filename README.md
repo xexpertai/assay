@@ -22,7 +22,7 @@ It runs fully offline on a laptop. No cloud API and no paid model are needed. An
 >
 > Use it only on code you own or are licensed to assess, and on evidence gathered inside an authorised lab.
 
-## What it checks (86 rule IDs across 10 analysers)
+## What it checks (87 rule IDs across 10 analysers)
 
 | Area | Examples |
 |---|---|
@@ -34,7 +34,7 @@ It runs fully offline on a laptop. No cloud API and no paid model are needed. An
 | Secrets (all text files) | AWS keys, private keys, GitHub/Slack/Google tokens, high-entropy credentials assigned to secret-like names |
 | Tool output files | nmap XML (open admin/database ports per host), nuclei JSONL (template matches with their severity), trivy JSON (vulnerable packages aggregated per package, failed misconfiguration checks) |
 | DataOps configs | Airflow (`airflow.cfg`: no auth, open REST API, exposed config, empty Fernet key, metadata DB password, example DAGs; DAG files: credential literals, `curl \| bash` tasks, privileged pods; `webserver_config.py` public Admin), dbt `profiles.yml` plain-text passwords/keys, SQL scripts (`GRANT ALL ... ON *.*`, grants to PUBLIC, `WITH GRANT OPTION`, user passwords in scripts, SUPERUSER), Kafka `server.properties` (PLAINTEXT listeners, allow-everyone, no authorizer); connection URIs with embedded passwords in any text file |
-| Event logs (CloudTrail `{"Records": [...]}` of any size up to 1 MB, pretty-printed or not, JSONL, CSV, syslog `auth.log` sshd lines; unparsable event-looking files are a logged skip) | brute force that succeeded (5+ failures, then a success),  failed-login bursts, console or root login without MFA, privilege-escalation API calls, new long-lived access keys, security logging switched off; unknown schemas map through one field dictionary |
+| Event logs (CloudTrail `{"Records": [...]}` pretty-printed or not, `.json.gz` as delivered to S3, JSONL, CSV, syslog `auth.log` sshd/sudo/useradd lines; keys matched case-insensitively; 32 MB cap for log-looking files, `--max-bytes` to change it; other archives are a logged skip; unparsable event-looking files are a logged skip) | brute force that succeeded (5+ failures, then a success), host persistence (new account, privileged group, authorized_keys, cron/sudoers edits; high only after a suspicious login, otherwise medium "admin activity"),  failed-login bursts, console or root login without MFA, privilege-escalation API calls, new long-lived access keys, security logging switched off; unknown schemas map through one field dictionary |
 
 Variables are resolved when Terraform itself would resolve them from files in the module directory: `terraform.tfvars` / `*.auto.tfvars`, and `variable` defaults for a root module (for a directory that another directory calls as a `module`, one level of module arguments is followed: a literal the caller passes becomes the variable's value, with the source shown as `argument of module.NAME in FILE`; a variable the caller passes as an expression, or callers that disagree, stay unresolved and are logged as "value comes from the module caller"; a variable no caller passes keeps its default). Every resolved value is shown in the evidence with its source (`[resolved: var.public (terraform.tfvars)]`). Otherwise values that come from variables are not guessed. When a security-relevant value is an expression (`var.x ? false : true`, `!var.x`, a `dynamic` block), the finding is reported at **medium** confidence with the expression shown; when it is a bare variable deciding public exposure, a low-confidence "depends on a variable" finding says so.
 
@@ -101,7 +101,7 @@ Writing an analyser plugin: implement `name`, `kinds` and `analyse(files, facts)
 ```bash
 scripts/get-samples.sh            # public, intentionally vulnerable repos, pinned commits
 uv run python -m eval.run_eval    # writes eval/results/*.json and SUMMARY.md
-uv run pytest -q                  # 161 tests
+uv run pytest -q                  # 174 tests
 ```
 
 | Test set | Result |
@@ -110,7 +110,7 @@ uv run pytest -q                  # 161 tests
 | **sadcloud after the post-blind fixes** (no longer blind) | 29/29 in coverage (six policy classes gained a rule on 16 Oct and now count); 2/4 bare-variable values reported as "depends on a variable"; 51 flags still have no rule. 67 findings, 3 chains. |
 | **TerraGoat** (Bridgecrew, Apache-2.0, commit `729f8da`): weaknesses its authors annotated with comments. Assay strips comments before analysis. | **16/16** detected for the clouds Assay covers (AWS); one "bucket is public" annotation is stale at that commit (no ACL or policy in the code) and is excluded rather than credited. 16/29 over all clouds: the misses are Alibaba Cloud, Oracle Cloud and Azure resources, which have no rules. 66 findings, 5 chains, 14 proposed patches, under a second. |
 | **Kubernetes Goat** (MIT, commit `723a0db`): scenarios whose weakness is visible statically | **6/6** detected. 112 findings, 6 chains. |
-| **Rule conformance suite** (`eval/fixtures/`, 70 cases: 47 vulnerable, 23 safe look-alikes, including provider-v4 Terraform, conditional values, indexed references and tool-output files) | 70/70 exact, including expected confidence levels; 23/23 safe cases produce no false finding. |
+| **Rule conformance suite** (`eval/fixtures/`, 72 cases: 48 with expected findings (one is routine admin onboarding, which must stay medium/low with no chain), 24 safe look-alikes, including provider-v4 Terraform, conditional values, indexed references and tool-output files) | 72/72 exact, including expected confidence and severity levels and a maximum chain count; 24/24 safe cases produce no false finding. |
 | **Safety checks** | 16/16: refusing 4 kinds of network target; a scan changes no files; apply refused without approval, after a plan edit, and without a named approver; only approved actions applied; a patch removes its finding on re-scan; the audit chain verifies; an in-place edit is detected; a chain regenerated without the run key is detected (HMAC); the key is stored outside the run directory; no output contains a full secret. |
 
 **Read these numbers honestly:**
@@ -121,6 +121,7 @@ uv run pytest -q                  # 161 tests
 - Precision on real repositories is not measured. A probe on a well-configured module (encrypted RDS, `var.db_password`, 443-only group, Deny-wildcard IAM, pbkdf2 hash) produced no false finding, but that is one probe.
 
 ## Limitations
+- Event chains need a suspicious signal first (failure burst, login without MFA, logging off, or a privilege change on oneself); actions on another user are reported as medium/low admin activity and never start a chain. Syslog lines carry no year: it is taken from the file's modification time and the assumption is logged.
 - Static configuration review plus ingestion of evidence files. By default Assay runs no scanners and never tests running systems; an active step (nmap/nuclei profile) runs only via `assay step run`, inside a declared lab allowlist, after a named person approves that exact step. It does not prove exploitability. The "confirmed by observation" chain matches by port number; it does not know which host a Terraform resource became.
 - Terraform variables are resolved only from tfvars files and root-module defaults; module arguments are followed one level only (literals; expressions and nested modules are not), and `TF_VAR_*`, `-var` and remote state are not followed. Other expressions lower confidence rather than being evaluated.
 - Cloud coverage is AWS plus a few GCP checks. Azure, Alibaba Cloud and Oracle Cloud are not covered. CloudTrail trail settings, IAM password policy, Redshift and ELBv2 have no Terraform rules yet (SQS/SNS/KMS/ECR/SES resource policies are covered by `TF-AWS-RESOURCE-POLICY-PUBLIC`).

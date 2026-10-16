@@ -1,0 +1,1 @@
+{"expect": ["EVT-PRIV-ESC", "EVT-NEW-ACCESS-KEY"], "severity": {"EVT-PRIV-ESC": "medium", "EVT-NEW-ACCESS-KEY": "low"}, "max_chains": 0}
