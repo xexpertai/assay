@@ -3,8 +3,8 @@
   "labels_total": 84,
   "by_kind": {
     "literal": {
-      "labels": 13,
-      "detected": 13
+      "labels": 19,
+      "detected": 19
     },
     "conditional": {
       "labels": 10,
@@ -15,12 +15,12 @@
       "detected": 3
     },
     "none": {
-      "labels": 57,
+      "labels": 51,
       "detected": 0
     }
   },
-  "detected_in_rule_coverage": 23,
-  "labels_in_rule_coverage": 23,
+  "detected_in_rule_coverage": 29,
+  "labels_in_rule_coverage": 29,
   "missed_in_coverage": [],
   "rows": [
     {
@@ -412,12 +412,17 @@
     {
       "module": "ecr",
       "flag": "ecr_repo_public",
-      "kind": "none",
+      "kind": "literal",
       "file": "modules/aws/ecr/main.tf",
-      "resource": "aws_ecr_repository_policy.mainecrpolicy",
-      "accept": [],
-      "detected": false,
-      "by": []
+      "resource": "aws_ecr_repository.main",
+      "accept": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures",
+      "detected": true,
+      "by": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ]
     },
     {
       "module": "eks",
@@ -521,12 +526,17 @@
     {
       "module": "glacier",
       "flag": "glacier_public",
-      "kind": "none",
+      "kind": "literal",
       "file": "modules/aws/glacier/main.tf",
       "resource": "aws_glacier_vault.main",
-      "accept": [],
-      "detected": false,
-      "by": []
+      "accept": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result)",
+      "detected": true,
+      "by": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ]
     },
     {
       "module": "iam",
@@ -712,13 +722,17 @@
     {
       "module": "kms",
       "flag": "kms_key_exposed",
-      "kind": "none",
+      "kind": "literal",
       "file": "modules/aws/kms/main.tf",
       "resource": "aws_kms_key.exposed",
-      "accept": [],
-      "note": "key policy with a wildcard principal; Assay checks bucket and assume-role policies only",
-      "detected": false,
-      "by": []
+      "accept": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "note": "key policy with a wildcard principal; Assay checks bucket and assume-role policies only; post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result)",
+      "detected": true,
+      "by": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ]
     },
     {
       "module": "lightsail",
@@ -964,32 +978,47 @@
     {
       "module": "ses",
       "flag": "identity_world_policy",
-      "kind": "none",
+      "kind": "literal",
       "file": "modules/aws/ses/main.tf",
-      "resource": "aws_ses_identity_policy.main",
-      "accept": [],
-      "detected": false,
-      "by": []
+      "resource": "aws_ses_domain_identity.main",
+      "accept": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures",
+      "detected": true,
+      "by": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ]
     },
     {
       "module": "sns",
       "flag": "topic_world_policy",
-      "kind": "none",
+      "kind": "literal",
       "file": "modules/aws/sns/main.tf",
-      "resource": "aws_sns_topic_policy.main-policy",
-      "accept": [],
-      "detected": false,
-      "by": []
+      "resource": "aws_sns_topic.main",
+      "accept": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures",
+      "detected": true,
+      "by": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ]
     },
     {
       "module": "sqs",
       "flag": "queue_world_policy",
-      "kind": "none",
+      "kind": "literal",
       "file": "modules/aws/sqs/main.tf",
-      "resource": "aws_sqs_queue_policy.main",
-      "accept": [],
-      "detected": false,
-      "by": []
+      "resource": "aws_sqs_queue.main",
+      "accept": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures",
+      "detected": true,
+      "by": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ]
     },
     {
       "module": "sqs",
@@ -1002,7 +1031,7 @@
       "by": []
     }
   ],
-  "total_findings": 61,
+  "total_findings": 67,
   "by_rule": {
     "SECRET-HARDCODED": 3,
     "TF-AWS-S3-POLICY-PUBLIC": 2,
@@ -1010,6 +1039,7 @@
     "TF-AWS-EC2-USERDATA-SECRET": 1,
     "TF-AWS-SG-OPEN-ADMIN": 6,
     "TF-AWS-SG-OPEN-DATA": 4,
+    "TF-AWS-RESOURCE-POLICY-PUBLIC": 6,
     "TF-AWS-IAM-WILDCARD": 2,
     "TF-AWS-DB-PLAINTEXT-PASSWORD": 1,
     "TF-AWS-SG-OPEN-PLAINTEXT": 2,
@@ -1022,9 +1052,9 @@
     "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED": 1,
     "TF-AWS-DB-UNENCRYPTED": 1,
     "TF-AWS-S3-NO-VERSIONING": 6,
+    "TF-AWS-ECR-NO-SCAN": 1,
     "TF-AWS-ELB-NO-LOGS": 1,
     "TF-AWS-EC2-IMDSV1": 1,
-    "TF-AWS-ECR-NO-SCAN": 1,
     "TF-AWS-KMS-NO-ROTATION": 1,
     "TF-AWS-UNRESOLVED-EXPOSURE": 2,
     "TF-AWS-SG-INTERNET-FACING": 4
@@ -1034,6 +1064,6 @@
     "One credential appears in 2 places",
     "Publicly reachable data store aws_s3_bucket.public lacks protection or audit trail"
   ],
-  "wall_s": 0.15,
+  "wall_s": 0.21,
   "files": 82
 }

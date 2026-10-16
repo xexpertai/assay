@@ -1,0 +1,118 @@
+{
+ "Records": [
+  {
+   "eventTime": "2026-10-01T10:00:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "errorMessage": "Failed authentication",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:01:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "errorMessage": "Failed authentication",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:02:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "errorMessage": "Failed authentication",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:03:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "errorMessage": "Failed authentication",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:04:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "errorMessage": "Failed authentication",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:05:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "errorMessage": "Failed authentication",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:07:00Z",
+   "eventName": "ConsoleLogin",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:root"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "additionalEventData": {
+    "MFAUsed": "No"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:08:00Z",
+   "eventName": "AttachUserPolicy",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "requestParameters": {
+    "userName": "alice",
+    "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:09:00Z",
+   "eventName": "CreateAccessKey",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7",
+   "requestParameters": {
+    "userName": "alice"
+   }
+  },
+  {
+   "eventTime": "2026-10-01T10:10:00Z",
+   "eventName": "StopLogging",
+   "userIdentity": {
+    "arn": "arn:aws:iam::123456789012:user/alice"
+   },
+   "sourceIPAddress": "203.0.113.7"
+  }
+ ]
+}

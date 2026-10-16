@@ -55,6 +55,16 @@ def to_markdown(res) -> str:
                   f"- **Evidence:** `{_esc(f.evidence)}`",
                   f"- **Why it matters:** {f.rationale}",
                   f"- **Fix:** {f.remediation}", ""]
+    if res.diff:
+        d = res.diff
+        lines += ["## Changes since baseline", "",
+                  f"Compared with `{d['baseline']}` ({d['baseline_findings']} findings): **{len(d['new'])} new**, "
+                  f"**{len(d['fixed'])} fixed**, {d['unchanged']} unchanged, {d['moved']} moved (same weakness, new line).", ""]
+        for label, items in (("New", d["new"]), ("Fixed", d["fixed"])):
+            if items:
+                lines.append(f"**{label}:**")
+                lines += [f"- `{i['id']}` [{i['severity']}] {_esc(i['title'])} (`{i['file']}:{i['line']}`)" for i in items]
+                lines.append("")
     lines += ["## Proposed actions (awaiting human approval)", ""]
     if not res.actions:
         lines.append("No mechanical patches proposed; all fixes above are manual.")
@@ -84,12 +94,20 @@ def to_sarif(res) -> dict:
         })
         results.append({
             "ruleId": f.rule_id, "level": SARIF_LEVEL[f.severity],
+            **({"baselineState": res.diff["state"].get(f.id, "new")} if res.diff else {}),
             "message": {"text": f"{f.title}. {f.rationale} Evidence: {f.evidence}"},
             "locations": [{"physicalLocation": {"artifactLocation": {"uri": f.file},
                                                 "region": {"startLine": max(f.line, 1)}}}],
             "partialFingerprints": {"assayId": f.id},
             "properties": {"severity": f.severity, "score": f.score, "confidence": f.confidence},
         })
+    for b in (res.diff or {}).get("fixed", []):  # findings present in the baseline and gone now
+        rules.setdefault(b["rule_id"], {"id": b["rule_id"], "shortDescription": {"text": b["title"] or b["rule_id"]}})
+        results.append({"ruleId": b["rule_id"], "level": SARIF_LEVEL.get(b.get("severity"), "note"),
+                        "baselineState": "absent", "message": {"text": f"{b['title']} (fixed since the baseline)"},
+                        "locations": [{"physicalLocation": {"artifactLocation": {"uri": b["file"]},
+                                                            "region": {"startLine": max(b.get("line") or 1, 1)}}}],
+                        "partialFingerprints": {"assayId": b["id"]}})
     return {"$schema": "https://json.schemastore.org/sarif-2.1.0.json", "version": "2.1.0",
             "runs": [{"tool": {"driver": {"name": "Assay", "version": __version__, "rules": list(rules.values())}},
                       "results": results}]}

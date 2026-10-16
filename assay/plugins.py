@@ -63,17 +63,36 @@ def _per_file(fn: Callable[[str, str], list[Finding]]):
 
 
 def _terraform(files: list[tuple[str, str]], facts: Facts) -> list[Finding]:
-    from .hcl import references
+    from .hcl import references, unquote
     from .rules import terraform
     out: list[Finding] = []
     by_dir: dict[str, list[tuple[str, str]]] = {}
-    for rel, txt in files:  # references are resolved per directory (one Terraform module)
-        by_dir.setdefault(str(Path(rel).parent), []).append((rel, txt))
-    for _, group in by_dir.items():
-        blocks = terraform.parse_all(group)
+    for rel, txt in files:  # references and variables are resolved per directory (one Terraform module)
+        d = str(Path(rel).parent).replace("\\", "/")
+        by_dir.setdefault("" if d == "." else d, []).append((rel, txt))
+    called = terraform.module_sources(files)  # directories used as module sources
+    parsed = {d: terraform.parse_all(g, apply_defaults=(d not in called)) for d, g in by_dir.items()}
+    # one level of module arguments: literals a caller passes become the called module's variable values
+    calls: dict[str, list[tuple[str, object]]] = {}
+    for d, blocks in parsed.items():
+        for rel, b in blocks:
+            if b.type == "module":
+                tgt = terraform.module_target(rel, unquote(b.get("source")))
+                if tgt in by_dir and tgt != d:
+                    calls.setdefault(tgt, []).append((rel, b))
+    for tgt, cs in calls.items():
+        declared = {b.labels[0] for _, b in parsed[tgt] if b.type == "variable" and b.labels}
+        ov, notes = terraform.module_overrides(cs, declared)
+        facts.skipped.extend(notes)
+        parsed[tgt] = terraform.parse_all(by_dir[tgt], apply_defaults=True, overrides=ov)
+    for d, group in by_dir.items():
+        blocks = parsed[d]
+        group = [(rel, txt) for rel, txt in group if rel.endswith(".tf")]
         for _, b in blocks:
             if b.type == "resource":  # union: the same address may appear in several module directories
                 facts.tf_refs.setdefault(b.address, set()).update(references(b))
+                if b.labels[0] in ("aws_iam_user", "aws_iam_role") and b.get("name"):
+                    facts.iam_names[b.address] = b.get("name").strip('"')
         for rel, txt in group:
             out += terraform.analyse_file(rel, txt, blocks)
     return out
@@ -84,7 +103,11 @@ def _kubernetes(files: list[tuple[str, str]], facts: Facts) -> list[Finding]:
     out: list[Finding] = []
     for rel, txt in files:
         out += kubernetes.analyse_file(rel, txt)
-        for doc in kubernetes.load_docs(txt):
+        docs = kubernetes.load_docs(txt)
+        skipped = kubernetes.unanalysed_kinds(docs)
+        if skipped:
+            facts.skipped.append((rel, f"no rules for kind(s) {', '.join(skipped)}"))
+        for doc in docs:
             spec = kubernetes._pod_spec(doc)
             name = (doc.get("metadata") or {}).get("name")
             if isinstance(spec, dict):
@@ -109,9 +132,9 @@ def _secrets(files: list[tuple[str, str]], facts: Facts) -> list[Finding]:
 
 
 def builtin() -> list[FunctionAnalyser]:
-    from .rules import kubernetes, misc, toolout
+    from .rules import dataops, events, kubernetes, misc, toolout
     return [
-        FunctionAnalyser("Terraform rules (AWS + GCP)", frozenset({"terraform"}), _terraform),
+        FunctionAnalyser("Terraform rules (AWS + GCP)", frozenset({"terraform", "tfvars"}), _terraform),
         FunctionAnalyser("Kubernetes rules", frozenset({"kubernetes"}), _kubernetes),
         FunctionAnalyser("docker-compose rules", frozenset({"compose"}), _per_file(kubernetes.analyse_compose)),
         FunctionAnalyser("Dockerfile rules", frozenset({"dockerfile"}), _per_file(misc.analyse_dockerfile)),
@@ -120,6 +143,9 @@ def builtin() -> list[FunctionAnalyser]:
                          _per_file(misc.analyse_requirements)),
         FunctionAnalyser("tool-output ingestion (nmap XML, nuclei JSONL, trivy JSON)",
                          frozenset({"nmap", "nuclei", "trivy"}), toolout.analyse),
+        FunctionAnalyser("event-log rules (CloudTrail-style JSON/JSONL/CSV)", frozenset({"eventlog"}), events.analyse),
+        FunctionAnalyser("DataOps config rules (Airflow, dbt, SQL grants, Kafka)",
+                         frozenset({"airflow-config", "airflow-dag", "dbt-profile", "sql", "kafka"}), dataops.analyse),
         FunctionAnalyser("secret scan (all text files)", frozenset({ALL_TEXT}), _secrets),
     ]
 

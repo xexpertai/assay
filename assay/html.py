@@ -136,6 +136,16 @@ def to_html(res) -> str:
                  f"<p><b>Where</b> <code>{_e(f.file)}:{f.line}</code>, {_e(f.resource)}</p>"
                  f"<p><b>Evidence</b> <code>{_e(f.evidence)}</code></p><p><b>Why it matters</b> {_e(f.rationale)}</p>"
                  f"<p><b>Fix</b> {_e(f.remediation)}</p></details>")
+    if res.diff:
+        d = res.diff
+        H.append(f"<h2>Changes since baseline</h2><p>Compared with <code>{_e(d['baseline'])}</code> ({d['baseline_findings']} "
+                 f"findings): <b>{len(d['new'])} new</b>, <b>{len(d['fixed'])} fixed</b>, {d['unchanged']} unchanged, "
+                 f"{d['moved']} moved (same weakness, new line).</p>")
+        for label, items in (("New", d["new"]), ("Fixed", d["fixed"])):
+            if items:
+                H.append(f"<p><b>{label}</b></p><ul>" + "".join(
+                    f"<li>{_sev(i['severity'])} <code>{_e(i['id'])}</code> {_e(i['title'])} "
+                    f"<span class='muted'>{_e(i['file'])}:{i['line']}</span></li>" for i in items) + "</ul>")
     H.append("<h2>Proposed actions (awaiting human approval)</h2>")
     if not res.actions:
         H.append("<p>No mechanical patches proposed; the fixes above are manual.</p>")

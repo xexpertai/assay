@@ -27,6 +27,91 @@
       "missed": []
     },
     {
+      "case": "dataops_airflow",
+      "safe_case": false,
+      "expected": [
+        "AIRFLOW-API-OPEN",
+        "AIRFLOW-CONN-PASSWORD",
+        "AIRFLOW-DAG-SECRET",
+        "AIRFLOW-EXPOSE-CONFIG",
+        "AIRFLOW-LOAD-EXAMPLES",
+        "AIRFLOW-NO-AUTH",
+        "AIRFLOW-NO-FERNET-KEY",
+        "AIRFLOW-PIPE-TO-SHELL"
+      ],
+      "got": [
+        "AIRFLOW-API-OPEN",
+        "AIRFLOW-CONN-PASSWORD",
+        "AIRFLOW-DAG-SECRET",
+        "AIRFLOW-EXPOSE-CONFIG",
+        "AIRFLOW-LOAD-EXAMPLES",
+        "AIRFLOW-NO-AUTH",
+        "AIRFLOW-NO-FERNET-KEY",
+        "AIRFLOW-PIPE-TO-SHELL"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "dataops_dbt",
+      "safe_case": false,
+      "expected": [
+        "DBT-PROFILE-SECRET"
+      ],
+      "got": [
+        "DBT-PROFILE-SECRET"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "dataops_kafka",
+      "safe_case": false,
+      "expected": [
+        "KAFKA-ALLOW-EVERYONE",
+        "KAFKA-PLAINTEXT-LISTENER"
+      ],
+      "got": [
+        "KAFKA-ALLOW-EVERYONE",
+        "KAFKA-PLAINTEXT-LISTENER"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "dataops_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "dataops_sql",
+      "safe_case": false,
+      "expected": [
+        "SQL-GRANT-ALL-GLOBAL",
+        "SQL-GRANT-OPTION",
+        "SQL-GRANT-PUBLIC",
+        "SQL-SUPERUSER",
+        "SQL-USER-PASSWORD-LITERAL"
+      ],
+      "got": [
+        "SQL-GRANT-ALL-GLOBAL",
+        "SQL-GRANT-OPTION",
+        "SQL-GRANT-PUBLIC",
+        "SQL-SUPERUSER",
+        "SQL-USER-PASSWORD-LITERAL"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "deps_safe",
       "safe_case": true,
       "expected": [],
@@ -115,6 +200,36 @@
       "got": [
         "SECRET-HARDCODED"
       ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "events_cloudtrail",
+      "safe_case": false,
+      "expected": [
+        "EVT-LOGGING-OFF",
+        "EVT-LOGIN-BURST",
+        "EVT-LOGIN-NO-MFA",
+        "EVT-NEW-ACCESS-KEY",
+        "EVT-PRIV-ESC"
+      ],
+      "got": [
+        "EVT-LOGGING-OFF",
+        "EVT-LOGIN-BURST",
+        "EVT-LOGIN-NO-MFA",
+        "EVT-NEW-ACCESS-KEY",
+        "EVT-PRIV-ESC"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "events_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
       "pass": true,
       "false_positives": [],
       "missed": []
@@ -254,6 +369,36 @@
         "K8S-IMAGE-UNPINNED",
         "K8S-NO-LIMITS"
       ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_list",
+      "safe_case": false,
+      "expected": [
+        "K8S-DANGEROUS-CAPS",
+        "K8S-ENV-SECRET",
+        "K8S-HARDENING-MISSING",
+        "K8S-HOSTPATH",
+        "K8S-NO-LIMITS"
+      ],
+      "got": [
+        "K8S-DANGEROUS-CAPS",
+        "K8S-ENV-SECRET",
+        "K8S-HARDENING-MISSING",
+        "K8S-HOSTPATH",
+        "K8S-NO-LIMITS"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "k8s_list_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
       "pass": true,
       "false_positives": [],
       "missed": []
@@ -481,6 +626,21 @@
       "missed": []
     },
     {
+      "case": "tf_imdsv1_norole",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-EC2-IMDSV1",
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "got": [
+        "TF-AWS-EC2-IMDSV1",
+        "TF-AWS-SG-INTERNET-FACING"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "tf_indexed_refs",
       "safe_case": false,
       "expected": [
@@ -520,6 +680,19 @@
       "missed": []
     },
     {
+      "case": "tf_module_called",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-UNRESOLVED-EXPOSURE"
+      ],
+      "got": [
+        "TF-AWS-UNRESOLVED-EXPOSURE"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
       "case": "tf_provider_creds",
       "safe_case": false,
       "expected": [
@@ -554,6 +727,41 @@
       "safe_case": true,
       "expected": [],
       "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_resource_policy_public",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "got": [
+        "TF-AWS-RESOURCE-POLICY-PUBLIC"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_resource_policy_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_s3_policy_blocked",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-S3-POLICY-PUBLIC"
+      ],
+      "got": [
+        "TF-AWS-S3-POLICY-PUBLIC"
+      ],
       "pass": true,
       "false_positives": [],
       "missed": []
@@ -719,16 +927,42 @@
       "pass": true,
       "false_positives": [],
       "missed": []
+    },
+    {
+      "case": "tf_vars_resolved",
+      "safe_case": false,
+      "expected": [
+        "TF-AWS-DB-PUBLIC",
+        "TF-AWS-EBS-UNENCRYPTED",
+        "TF-AWS-SG-OPEN-DATA"
+      ],
+      "got": [
+        "TF-AWS-DB-PUBLIC",
+        "TF-AWS-EBS-UNENCRYPTED",
+        "TF-AWS-SG-OPEN-DATA"
+      ],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
+    },
+    {
+      "case": "tf_vars_safe",
+      "safe_case": true,
+      "expected": [],
+      "got": [],
+      "pass": true,
+      "false_positives": [],
+      "missed": []
     }
   ],
-  "n_cases": 54,
-  "passed": 54,
-  "rule_hits_tp": 78,
+  "n_cases": 70,
+  "passed": 70,
+  "rule_hits_tp": 112,
   "rule_hits_fp": 0,
   "rule_hits_fn": 0,
   "precision": 1.0,
   "recall": 1.0,
-  "safe_cases": 18,
-  "safe_cases_clean": 18,
+  "safe_cases": 23,
+  "safe_cases_clean": 23,
   "errors": {}
 }

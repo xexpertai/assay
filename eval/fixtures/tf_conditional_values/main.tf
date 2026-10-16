@@ -1,5 +1,5 @@
-variable "public" { default = false }
-variable "no_encryption" { default = false }
+variable "public" {}  # no default: value comes from the caller
+variable "no_encryption" {}
 resource "aws_db_instance" "main" {
   identifier          = "main"
   engine              = "postgres"

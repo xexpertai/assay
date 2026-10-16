@@ -18,6 +18,7 @@ HEREDOC_RE = re.compile(r"<<-?([A-Za-z_][A-Za-z0-9_]*)[ \t]*\n")
 class Attr:
     value: str
     line: int
+    resolved_from: str = ""  # e.g. "var.public (terraform.tfvars)" when a variable reference was substituted
 
 
 @dataclass

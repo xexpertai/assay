@@ -27,11 +27,35 @@ def _construct_mapping(loader, node, deep=False):
 _LineLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
+RBAC_KINDS = {"Role", "ClusterRole", "RoleBinding", "ClusterRoleBinding"}
+ANALYSED_KINDS = WORKLOADS | RBAC_KINDS
+
+
+def _expand(doc: dict) -> list[dict]:
+    """`kind: List` (kubectl get -o yaml, kustomize, some Helm output) carries the real objects in items:."""
+    if doc.get("kind") == "List" and isinstance(doc.get("items"), list):
+        out = []
+        for item in doc["items"]:
+            if isinstance(item, dict):
+                out += _expand(item)
+        return out
+    return [doc]
+
+
 def load_docs(text: str) -> list[dict]:
     try:
-        return [d for d in yaml.load_all(text, Loader=_LineLoader) if isinstance(d, dict)]
+        docs = [d for d in yaml.load_all(text, Loader=_LineLoader) if isinstance(d, dict)]
     except yaml.YAMLError:
         return []
+    out: list[dict] = []
+    for d in docs:
+        out += _expand(d)
+    return out
+
+
+def unanalysed_kinds(docs: list[dict]) -> list[str]:
+    """Kinds present in a file that no rule looks at (reported as a plan decision, never silently dropped)."""
+    return sorted({str(d.get("kind")) for d in docs if d.get("kind") and d.get("kind") not in ANALYSED_KINDS})
 
 
 def _pod_spec(doc: dict) -> dict | None:

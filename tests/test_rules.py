@@ -20,6 +20,8 @@ def test_fixture_exact(case, tmp_path):
     assert {f.rule_id for f in findings} == set(spec["expect"])
     for rule, conf in spec.get("confidence", {}).items():  # e.g. non-literal CIDR expressions drop to medium
         assert {f.confidence for f in findings if f.rule_id == rule} == {conf}
+    for rule, sev in spec.get("severity", {}).items():  # e.g. a public policy demoted by the public access block
+        assert {f.severity for f in findings if f.rule_id == rule} == {sev}
 
 
 def test_secret_patterns_and_redaction():
@@ -61,3 +63,24 @@ def test_policy_statements_are_judged_separately():
     assert not _principal_any(deny_star_allow_named)
     assert _principal_any('{"Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":"s3:GetObject"}]}')
     assert _principal_any('jsonencode({Statement=[{Effect="Allow",Principal="*",Action="sts:AssumeRole"}]})')
+
+
+def test_variable_resolution_reports_its_source(tmp_path):
+    dst = tmp_path / "x"
+    shutil.copytree(FIX / "tf_vars_resolved", dst, ignore=shutil.ignore_patterns("expected.json"))
+    by = {f.rule_id: f for f in run(str(dst)).findings}
+    assert "var.public (terraform.tfvars)" in by["TF-AWS-DB-PUBLIC"].evidence
+    assert "var.cidr (terraform.tfvars)" in by["TF-AWS-SG-OPEN-DATA"].evidence and by["TF-AWS-SG-OPEN-DATA"].confidence == "high"
+    assert "!var.encrypt (default in variables.tf)" in by["TF-AWS-EBS-UNENCRYPTED"].evidence
+    assert "TF-AWS-DB-UNENCRYPTED" not in by  # var.encrypt ? true : false resolved to true
+    assert "TF-AWS-UNRESOLVED-EXPOSURE" not in by  # nothing left unresolved
+    from assay.rules.terraform import variable_values
+    vals = variable_values([("variables.tf", 'variable "x" { default = var.y }\nvariable "z" { default = 3 }'),
+                            ("prod.auto.tfvars", 'z = 4 # comment')])
+    assert vals == {"z": ("4", "prod.auto.tfvars")}  # expression defaults are not literal
+
+
+def test_module_defaults_are_not_trusted_when_a_caller_can_override():
+    from assay.rules.terraform import module_sources
+    assert module_sources([("env/prod/main.tf", 'module "db" { source = "../../modules/db" }')]) == {"modules/db"}
+    assert module_sources([("main.tf", 'module "x" { source = "git::https://example/x.git" }')]) == set()

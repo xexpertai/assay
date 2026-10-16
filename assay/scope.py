@@ -9,8 +9,8 @@ refused before any work starts.
   evidence, but no active step can ever be authorised.
 - `lab-allowlist`: an explicit, time-limited, named-owner allowlist loaded from a lab file.
   Evidence about hosts outside it is dropped, and an active step is allowed only for a
-  listed host, only with a recorded human approval. The library ships no active runners;
-  the gate exists so that any runner added later cannot bypass it.
+  listed host, only with a recorded human approval. The only active runner (`runners.py`) is
+  built on this gate and refuses to run without it and without an audit log.
 """
 from __future__ import annotations
 
@@ -67,8 +67,10 @@ class Scope:
         except ValueError:
             return False
 
-    def files(self):
-        """Yield in-scope regular files (no symlinks escaping the root, no huge files)."""
+    def files(self, skipped: list | None = None):
+        """Yield in-scope regular files (no symlinks escaping the root, no huge files).
+
+        Files over the size cap are not silently dropped: (relative path, reason) is appended to `skipped`."""
         for dirpath, dirnames, filenames in os.walk(self.root, followlinks=False):
             dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
             for name in sorted(filenames):
@@ -78,6 +80,9 @@ class Scope:
                 if not p.is_file() or not self.contains(p):
                     continue
                 if p.stat().st_size > MAX_FILE_BYTES:
+                    if skipped is not None:
+                        skipped.append((p.relative_to(self.root).as_posix(),
+                                        f"{p.stat().st_size} bytes is over the {MAX_FILE_BYTES} byte file cap"))
                     continue
                 yield p
 

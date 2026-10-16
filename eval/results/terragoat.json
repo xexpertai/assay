@@ -327,13 +327,13 @@
       "by": []
     }
   ],
-  "total_findings": 65,
+  "total_findings": 66,
   "chains": [
     "Internet-reachable aws_instance.web_host carries plaintext credentials",
     "Internet-reachable aws_instance.db_app carries plaintext credentials",
     "SSRF on internet-facing aws_instance.db_app could steal its role credentials",
-    "SSRF on internet-facing aws_instance.web_host could steal its role credentials",
-    "Publicly reachable data store aws_db_instance.default lacks protection or audit trail"
+    "Publicly reachable data store aws_db_instance.default lacks protection or audit trail",
+    "SSRF on internet-facing aws_instance.web_host would reach the metadata service"
   ],
   "aws_findings_not_in_annotations": [
     {
@@ -351,6 +351,14 @@
       "file": "terraform/aws/providers.tf",
       "line": 11,
       "title": "Provider credential 'secret_key' hard-coded"
+    },
+    {
+      "id": "F-8492d021",
+      "rule": "TF-AWS-DB-PLAINTEXT-PASSWORD",
+      "resource": "aws_db_instance.default",
+      "file": "terraform/aws/db-app.tf",
+      "line": 15,
+      "title": "Database password is hard-coded"
     },
     {
       "id": "F-6f2fc084",
@@ -595,6 +603,7 @@
   ],
   "aws_unannotated_by_rule": {
     "TF-PROVIDER-CREDENTIAL": 2,
+    "TF-AWS-DB-PLAINTEXT-PASSWORD": 1,
     "TF-AWS-DB-PUBLIC": 1,
     "TF-AWS-DB-UNENCRYPTED": 11,
     "TF-AWS-EKS-PUBLIC-ENDPOINT": 1,
@@ -610,6 +619,6 @@
     "TF-AWS-IAM-ACCESS-KEY": 1
   },
   "proposed_actions": 14,
-  "wall_s": 0.85,
+  "wall_s": 0.92,
   "files": 72
 }

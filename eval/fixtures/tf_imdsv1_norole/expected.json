@@ -1,0 +1,1 @@
+{"expect":["TF-AWS-SG-INTERNET-FACING","TF-AWS-EC2-IMDSV1"],"confidence":{"TF-AWS-EC2-IMDSV1":"high"}}

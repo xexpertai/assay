@@ -3,7 +3,7 @@
 Status: **storyboard only, not rendered.** Rendering happens after the submission format is known (31 Oct). Before any cut is shown to Harsha it must pass the QA in CLAUDE.md rule 7: frames reviewed every 2 s at ≥ 1000 px wide, loudness −14 LUFS, true peak ≤ −1 dBTP, no silence > 0.6 s.
 
 Production notes
-- Voice: synthetic (Kokoro, af_heart) from `~/workspace/.video-venv`; subtitles burned in. Screen: a terminal at 1920×1080, 20 pt font, plus `report.html` in a plain browser window (no bookmarks bar, no third-party logos or product names on screen).
+- Voice: synthetic (Kokoro, af_heart) from `~/workspace/.video-venv`; subtitles burned in. Screen: a terminal at 1920×1080, 20 pt font, plus `report.html` in a plain browser window (no bookmarks bar, no third-party logos). Tool names that appear in Assay's own output (nmap, OpenSSH version banners, trivy, nuclei) are factual evidence and stay as printed; nothing else third-party is shown.
 - Every number on screen comes from a real run: `scripts/demo.sh` produces every terminal shot in order; `eval/results/SUMMARY.md` gives the figures for the last shot. Labels: the demo repo is a **Template** (fixture copy; all credentials are AWS documentation examples); the nmap file is a **Template** evidence file for a fictional lab address.
 - No invented user stories, no "customers", no third-party trademarks. Sample repositories are named with their licence.
 - Keep the last 30 s generic now; re-cut only that part during the event with the official problem.

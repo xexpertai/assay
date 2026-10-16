@@ -30,6 +30,9 @@ PATTERNS: list[tuple[str, re.Pattern, str]] = [
     ("Slack token", re.compile(r"\b(xox[abprs]-[A-Za-z0-9-]{10,})\b"), "high"),
     ("Google API key", re.compile(r"\b(AIza[0-9A-Za-z_\-]{35})\b"), "high"),
     ("Stripe secret key", re.compile(r"\b(sk_live_[0-9A-Za-z]{16,})\b"), "high"),
+    ("password in connection URI",
+     re.compile(r"(?i)\b(?:postgres(?:ql)?|mysql(?:\+\w+)?|mongodb(?:\+srv)?|redis|amqp|mssql|snowflake|oracle|jdbc:\w+|"
+                r"sqlserver|clickhouse|kafka|ftp|smb)://[^:/\s@'\"]+:([^@\s'\"]{4,})@"), "high"),
 ]
 
 SECRET_NAME = r"(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?key|auth[_-]?token|token|private[_-]?key|client[_-]?secret)"
@@ -77,6 +80,8 @@ def scan_text(text: str) -> list[SecretHit]:
         for kind, rx, conf in PATTERNS:
             for m in rx.finditer(line):
                 v = m.group(1)
+                if is_placeholder(v) or v.startswith(("${", "{{", "%(")):
+                    continue
                 if (i, v) not in seen:
                     seen.add((i, v))
                     hits.append(SecretHit(kind, v, i, conf))

@@ -1,0 +1,5 @@
+-- bootstrap for the reporting database
+CREATE USER reporter WITH PASSWORD 'R3p0rt3r!pw2026';
+GRANT ALL PRIVILEGES ON *.* TO 'etl'@'%' WITH GRANT OPTION;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;
+ALTER USER reporter WITH SUPERUSER;

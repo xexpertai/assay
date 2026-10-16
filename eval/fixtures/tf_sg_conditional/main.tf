@@ -1,4 +1,4 @@
-variable "world" { default = false }
+variable "world" {}  # no default: value comes from the caller
 resource "aws_security_group" "db" {
   name = "db"
   ingress {

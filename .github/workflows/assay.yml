@@ -1,0 +1,48 @@
+# Pipeline integration example: run Assay on every push and pull request, publish the SARIF to the
+# repository's code-scanning tab, and keep the full run (reports, plan, audit log) as an artifact.
+# Copy this file into your own repository. Assay reads files only; it never contacts a host.
+# In this repository the scan covers eval/fixtures, which are intentionally vulnerable, so the
+# code-scanning alerts it produces here are expected.
+name: assay
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+  security-events: write   # needed by upload-sarif
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: uv run pytest -q
+      - name: Fetch the base branch's last run as a baseline (pull requests only; absent on the first run)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        continue-on-error: true
+        with:
+          workflow: assay.yml
+          branch: ${{ github.base_ref }}
+          name: assay-run
+          path: baseline
+      - name: Assess the repository (read-only; proposes patches, applies nothing)
+        run: |
+          if [ -f baseline/findings.json ]; then
+            uv run assay scan . --out assay-run --baseline baseline/findings.json --fail-on new
+          else
+            uv run assay scan . --out assay-run
+          fi
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: assay-run/report.sarif
+          category: assay
+      - name: Keep the full run (report.html, report.md, findings.json, plan.json, audit.jsonl)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assay-run
+          path: assay-run

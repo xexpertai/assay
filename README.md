@@ -14,7 +14,7 @@ It **proposes** fixes as patches. It never changes anything until a named person
 It runs fully offline on a laptop. No cloud API and no paid model are needed. An optional local model (any llama.cpp server, for example Gemma 4 E2B on a CPU) can write the plain-language briefing; its text is checked against the facts before it is used.
 
 > **Safety by design.**
-> - Assay reads local files only. It refuses URLs, IP addresses and host:port targets, and it never opens a connection to a target. It ships no scanner runners.
+> - Assay reads local files only. It refuses URLs, IP addresses and host:port targets, and it never opens a connection to a target. The only way to run a tool against a host is `assay/runners.py`: a declared command profile, a lab allowlist, a listed host and a named approval, dry-run first, every step in the audit log, output saved as evidence and read like any other file. Nothing runs by default.
 > - Its scope policy is `files-only` by default. A `lab-allowlist` policy can be loaded from a lab file that names the lab, its owner, an expiry date and the allowed hosts or networks; evidence about any other host is dropped and the drop is logged. Any future active step must pass `ScopePolicy.authorise_active()`, which refuses unless the policy is a lab allowlist, the host is listed and a named human approval is recorded.
 > - It ignores symlinks that point outside the scope.
 > - It redacts every secret (a 2-4 character prefix plus the length) and never keeps query strings from tool output.
@@ -22,19 +22,21 @@ It runs fully offline on a laptop. No cloud API and no paid model are needed. An
 >
 > Use it only on code you own or are licensed to assess, and on evidence gathered inside an authorised lab.
 
-## What it checks (59 rule IDs across 8 analysers)
+## What it checks (86 rule IDs across 10 analysers)
 
 | Area | Examples |
 |---|---|
-| Terraform (AWS, plus GCP basics) | public S3 ACLs and policies (inline, `aws_s3_bucket_acl`/`_policy` companions, `data.aws_iam_policy_document`), public access blocks switched off, SSH/RDP/Telnet/VNC, database and plain-text-protocol ports open to `0.0.0.0/0` (inline `ingress`, `aws_security_group_rule`, `aws_vpc_security_group_ingress_rule`), secrets in EC2 user data and Lambda env vars, public or unencrypted databases, wildcard IAM and roles anyone can assume, unencrypted EBS and snapshots, KMS rotation, IMDSv1, public EKS endpoint, open GCP firewalls, public GCS |
+| Terraform (AWS, plus GCP basics) | public S3 ACLs and policies (inline, `aws_s3_bucket_acl`/`_policy` companions, `data.aws_iam_policy_document`), public access blocks switched off, SSH/RDP/Telnet/VNC, database and plain-text-protocol ports open to `0.0.0.0/0` (inline `ingress`, `aws_security_group_rule`, `aws_vpc_security_group_ingress_rule`), secrets in EC2 user data and Lambda env vars, public or unencrypted databases, wildcard IAM and roles anyone can assume, SQS/SNS/KMS/ECR/Secrets Manager/Glacier/OpenSearch/EFS resource policies open to every principal, unencrypted EBS and snapshots, KMS rotation, IMDSv1, public EKS endpoint, open GCP firewalls, public GCS |
 | Kubernetes | privileged containers, hostPath (docker.sock, `/`), host namespaces, dangerous capabilities, plain-text secret env values, wildcard RBAC, cluster-admin bindings, missing limits and hardening, unpinned images |
 | Dockerfile / compose | root user, unpinned base, `curl \| sh`, secrets in ENV/ARG, secret files copied into a layer, privileged compose services, docker.sock mounts |
 | GitHub Actions | `pull_request_target` checking out PR code, script injection from `${{ github.event.issue.title }}` and similar, unpinned third-party actions, `write-all` tokens |
 | Dependencies | unpinned requirements, plain-HTTP package index, `*`/`latest` npm versions |
 | Secrets (all text files) | AWS keys, private keys, GitHub/Slack/Google tokens, high-entropy credentials assigned to secret-like names |
 | Tool output files | nmap XML (open admin/database ports per host), nuclei JSONL (template matches with their severity), trivy JSON (vulnerable packages aggregated per package, failed misconfiguration checks) |
+| DataOps configs | Airflow (`airflow.cfg`: no auth, open REST API, exposed config, empty Fernet key, metadata DB password, example DAGs; DAG files: credential literals, `curl \| bash` tasks, privileged pods; `webserver_config.py` public Admin), dbt `profiles.yml` plain-text passwords/keys, SQL scripts (`GRANT ALL ... ON *.*`, grants to PUBLIC, `WITH GRANT OPTION`, user passwords in scripts, SUPERUSER), Kafka `server.properties` (PLAINTEXT listeners, allow-everyone, no authorizer); connection URIs with embedded passwords in any text file |
+| Event logs (CloudTrail `{"Records": [...]}` of any size up to 1 MB, pretty-printed or not, JSONL, CSV, syslog `auth.log` sshd lines; unparsable event-looking files are a logged skip) | brute force that succeeded (5+ failures, then a success),  failed-login bursts, console or root login without MFA, privilege-escalation API calls, new long-lived access keys, security logging switched off; unknown schemas map through one field dictionary |
 
-Values that come from variables are not guessed. When a security-relevant value is an expression (`var.x ? false : true`, `!var.x`, a `dynamic` block), the finding is reported at **medium** confidence with the expression shown; when it is a bare variable deciding public exposure, a low-confidence "depends on a variable" finding says so.
+Variables are resolved when Terraform itself would resolve them from files in the module directory: `terraform.tfvars` / `*.auto.tfvars`, and `variable` defaults for a root module (for a directory that another directory calls as a `module`, one level of module arguments is followed: a literal the caller passes becomes the variable's value, with the source shown as `argument of module.NAME in FILE`; a variable the caller passes as an expression, or callers that disagree, stay unresolved and are logged as "value comes from the module caller"; a variable no caller passes keeps its default). Every resolved value is shown in the evidence with its source (`[resolved: var.public (terraform.tfvars)]`). Otherwise values that come from variables are not guessed. When a security-relevant value is an expression (`var.x ? false : true`, `!var.x`, a `dynamic` block), the finding is reported at **medium** confidence with the expression shown; when it is a bare variable deciding public exposure, a low-confidence "depends on a variable" finding says so.
 
 ## How the agent works
 
@@ -43,7 +45,8 @@ scope guard + policy ─► recon (inventory + file classification)
            ─► plan (analyser registry: every run and skip logged with a reason; plugins via entry points)
            ─► analyse (rules → findings with evidence, CWE, rationale, remediation, structured facts)
            ─► correlate (Terraform references, k8s service-account bindings, secret fingerprints,
-                         observed ports from tool output vs configured exposure)
+                         observed ports from tool output vs configured exposure; event-log kill chains per actor,
+                         log actors vs IAM findings, Airflow / Kafka / SQL combinations)
            ─► prioritise (score = severity × confidence, +1 internet-exposed, +1.5 part of a chain; factors shown)
            ─► propose actions (mechanical Terraform patches as diffs; nothing applied)
            ─► report (Markdown, HTML with chain diagrams, JSON, SARIF 2.1.0) + keyed audit log
@@ -69,7 +72,24 @@ uv run assay apply runs/myrepo             # applies only A-01; refuses if anyth
 uv run assay verify-log runs/myrepo        # hash chain + HMAC under the per-run key in ~/.config/assay/keys
 uv run assay scan lab-repo --lab lab.json  # lab allowlist: see docs/lab.example.json
 uv run assay scan path/to/repo --llm --llm-url http://127.0.0.1:8080   # optional local-model briefing
+scripts/demo-lab.sh                        # active step: plan → refused → approve → run once → evidence scanned (offline, fake nmap)
 scripts/demo.sh                            # refusal → scan → explain → approve → apply → verify-log, ~2 s
+uv run assay scan . --out runs/today --baseline runs/yesterday/findings.json --fail-on new   # CI gate (exit 4 on new findings)
+```
+
+**Baseline / diff mode.** `--baseline previous/findings.json` compares the run with an earlier one: findings are matched by id, then by a line-independent fingerprint so an edit above a weakness does not make it "new". The reports gain a "Changes since baseline" section (new, fixed, unchanged, moved), `findings.json` carries the full diff, and every SARIF result gets `baselineState` (`new`, `unchanged`, `updated`, or `absent` for fixed findings) so code-scanning shows only what changed. `--fail-on new|any` with `--fail-min-severity` turns the scan into a pipeline gate: exit code 4 when findings remain, 2 when a target or baseline is refused, 0 otherwise.
+
+**In a pipeline.** `.github/workflows/assay.yml` runs the tests, assesses the repository on every push and pull request, compares pull requests with the base branch's run (`--baseline`, `--fail-on new`), uploads `report.sarif` to GitHub code scanning and keeps the whole run as an artifact; copy it into your repository. As a pre-commit hook (`.pre-commit-config.yaml`):
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: assay
+        name: assay (read-only assessment)
+        entry: uv run assay scan . --out .assay-run
+        language: system
+        pass_filenames: false
 ```
 
 Writing an analyser plugin: implement `name`, `kinds` and `analyse(files, facts)` (see `assay/plugins.py`) and register it under the `assay.analysers` entry-point group. The plan lists it with its origin.
@@ -79,20 +99,20 @@ Writing an analyser plugin: implement `name`, `kinds` and `analyse(files, facts)
 ```bash
 scripts/get-samples.sh            # public, intentionally vulnerable repos, pinned commits
 uv run python -m eval.run_eval    # writes eval/results/*.json and SUMMARY.md
-uv run pytest -q                  # 95 tests
+uv run pytest -q                  # 154 tests
 ```
 
 | Test set | Result |
 |---|---|
-| **sadcloud, blind** (NCC Group, Apache-2.0, commit `f538652`): 84 misconfiguration flags, labelled *after* the first run; the rules were frozen before the repository was opened (git tag `rules-frozen-for-blind-sample`). | **18/23** flags detected where Assay had a rule and the value was visible in the code (`eval/results/sadcloud_blind_frozen.json`). Misses: an indexed reference (`[0].id`), two `data.aws_iam_policy_document` policies, FTP/Telnet ports. 57 of the 84 flags need rules Assay does not have (CloudTrail, password policy, Redshift, SQS/SNS/SES policies, and so on). |
-| **sadcloud after the post-blind fixes** (no longer blind) | 23/23 in coverage; 3/4 bare-variable values now reported as "depends on a variable". 61 findings, 3 chains. |
-| **TerraGoat** (Bridgecrew, Apache-2.0, commit `729f8da`): weaknesses its authors annotated with comments. Assay strips comments before analysis. | **16/16** detected for the clouds Assay covers (AWS); one "bucket is public" annotation is stale at that commit (no ACL or policy in the code) and is excluded rather than credited. 16/29 over all clouds: the misses are Alibaba Cloud, Oracle Cloud and Azure resources, which have no rules. 65 findings, 5 chains, 14 proposed patches, under a second. |
+| **sadcloud, blind** (NCC Group, Apache-2.0, commit `f538652`): 84 misconfiguration flags, labelled *after* the first run; the rules were frozen before the repository was opened (git tag `rules-frozen-for-blind-sample`). | **18/23** flags detected where Assay had a rule and the value was visible in the code (`eval/results/sadcloud_blind_frozen.json`). Misses: an indexed reference (`[0].id`), two `data.aws_iam_policy_document` policies, FTP/Telnet ports. 57 of the 84 flags needed rules Assay did not have at the time (CloudTrail, password policy, Redshift, SQS/SNS/SES policies, and so on); six of those classes gained a rule afterwards. |
+| **sadcloud after the post-blind fixes** (no longer blind) | 29/29 in coverage (six policy classes gained a rule on 16 Oct and now count); 3/4 bare-variable values reported as "depends on a variable"; 51 flags still have no rule. 67 findings, 3 chains. |
+| **TerraGoat** (Bridgecrew, Apache-2.0, commit `729f8da`): weaknesses its authors annotated with comments. Assay strips comments before analysis. | **16/16** detected for the clouds Assay covers (AWS); one "bucket is public" annotation is stale at that commit (no ACL or policy in the code) and is excluded rather than credited. 16/29 over all clouds: the misses are Alibaba Cloud, Oracle Cloud and Azure resources, which have no rules. 66 findings, 5 chains, 14 proposed patches, under a second. |
 | **Kubernetes Goat** (MIT, commit `723a0db`): scenarios whose weakness is visible statically | **6/6** detected. 112 findings, 6 chains. |
-| **Rule conformance suite** (`eval/fixtures/`, 54 cases: 36 vulnerable, 18 safe look-alikes, including provider-v4 Terraform, conditional values, indexed references and tool-output files) | 54/54 exact, including expected confidence levels; 18/18 safe cases produce no false finding. |
+| **Rule conformance suite** (`eval/fixtures/`, 70 cases: 47 vulnerable, 23 safe look-alikes, including provider-v4 Terraform, conditional values, indexed references and tool-output files) | 70/70 exact, including expected confidence levels; 23/23 safe cases produce no false finding. |
 | **Safety checks** | 16/16: refusing 4 kinds of network target; a scan changes no files; apply refused without approval, after a plan edit, and without a named approver; only approved actions applied; a patch removes its finding on re-scan; the audit chain verifies; an in-place edit is detected; a chain regenerated without the run key is detected (HMAC); the key is stored outside the run directory; no output contains a full secret. |
 
 **Read these numbers honestly:**
-- The sadcloud blind number (18/23) is the one independent figure. Everything that followed it was tuned with sadcloud visible, so 23/23 is a regression test, not a second blind result. The flag-to-rule mapping (`eval/sadcloud_labels.json`) was written by the builder after reading each module; it states for every flag whether the value is literal, conditional, a bare variable or outside Assay's rules.
+- The sadcloud blind number (18/23) is the one independent figure. Everything that followed it was tuned with sadcloud visible, so the post-fix 29/29 is a regression test, not a second blind result. The flag-to-rule mapping (`eval/sadcloud_labels.json`) was written by the builder after reading each module; it states for every flag whether the value is literal, conditional, a bare variable or outside Assay's rules.
 - The fixture suite was written by the builder alongside the rules. It shows the rules behave as designed; it is not an independent accuracy benchmark.
 - The TerraGoat annotations were visible while the rules were written, so that test is not blind. Assay reported 32 AWS findings beyond the annotations; they are listed in `eval/results/terragoat.json` and are not counted as true or false positives. A spot check found each literally true.
 - The Kubernetes Goat scenario-to-rule mapping was written by the builder.
@@ -100,9 +120,10 @@ uv run pytest -q                  # 95 tests
 
 ## Limitations
 - Static configuration review plus ingestion of evidence files. Assay does not run scanners, does not test running systems and does not prove exploitability. The "confirmed by observation" chain matches by port number; it does not know which host a Terraform resource became.
-- Terraform variables and modules are not resolved; expressions lower confidence rather than being evaluated.
-- Cloud coverage is AWS plus a few GCP checks. Azure, Alibaba Cloud and Oracle Cloud are not covered. CloudTrail, IAM password policy, Redshift, SQS/SNS/SES/KMS/ECR resource policies and ELBv2 have no rules yet.
-- Helm templates (files containing `{{`) are skipped; render them first.
+- Terraform variables are resolved only from tfvars files and root-module defaults; module arguments are followed one level only (literals; expressions and nested modules are not), and `TF_VAR_*`, `-var` and remote state are not followed. Other expressions lower confidence rather than being evaluated.
+- Cloud coverage is AWS plus a few GCP checks. Azure, Alibaba Cloud and Oracle Cloud are not covered. CloudTrail trail settings, IAM password policy, Redshift and ELBv2 have no Terraform rules yet (SQS/SNS/KMS/ECR/SES resource policies are covered by `TF-AWS-RESOURCE-POLICY-PUBLIC`).
+- Helm templates (files containing `{{`) are skipped; render them first. `kind: List` documents are expanded; kinds without rules (Service, ConfigMap, ...) are recorded as a skip decision.
+- EC2 user data given as `file("boot.sh")` or `templatefile(...)` is not followed: a secret in `boot.sh` is reported by the generic secret scan on that file, but it is not chained to the instance.
 - The optional model briefing is validated for IDs, numbers and invented actions, but not for every paraphrase: in the TerraGoat run Gemma 4 E2B called `aws_instance.db_app` a "database" (`eval/results/llm_briefing.json`). The deterministic template is the default, and the report always names the author of the briefing. Each model briefing took about 36 s on a busy laptop CPU.
 - Dependency checks cover pinning hygiene only; trivy output supplies vulnerability data when present. No vulnerability database lookup (offline by design).
 - nmap XML is parsed with the standard library parser; only feed it files you produced or trust.
@@ -112,7 +133,7 @@ uv run pytest -q                  # 95 tests
 - `scope.py` (scope guard, `ScopePolicy`), `inventory.py`, `hcl.py` (dependency-free Terraform parser), `plugins.py` (analyser registry), `rules/` (`terraform.py`, `kubernetes.py`, `misc.py`, `secrets.py`, `toolout.py`);
 - `correlate.py`, `actions.py` (approval gate, keyed audit log), `explain.py`, `narrate.py` (optional local model, grounded), `report.py`, `html.py`, `agent.py`, `cli.py`.
 
-`eval/` holds the fixtures, labels and runner. `tests/` holds the unit, safety and policy tests. `templates/event-repo/` is the provenance-first skeleton for a project that depends on Assay. `docs/` has the write-up, the video storyboard and a lab-file example.
+`runners.py` is the gated active-step runner (dry-run and declared command profiles; it refuses to run without an audit log) and `steps.py` is the human flow on top of it: `assay step plan | approve | run`, with the approval bound to the exact command, host and lab file and recorded in the keyed audit log (single use). `docs/EVENT-PLAYBOOK.md` explains how to extend the kernel for a new problem in days. `eval/` holds the fixtures, labels and runner. `tests/` holds the unit, safety and policy tests. `templates/event-repo/` is the provenance-first skeleton for a project that depends on Assay. `docs/` has the write-up, the video storyboard and a lab-file example.
 
 ## Disclosure
 - **AI assistance:** this project was built with AI coding assistance (Claude Code). All rules, numbers and claims were checked by running the code; the evaluation outputs are committed.

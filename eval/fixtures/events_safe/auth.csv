@@ -1,0 +1,5 @@
+timestamp,username,action,source_ip,outcome,mfa
+2026-10-01T09:00:00Z,bob,login,10.0.0.5,success,yes
+2026-10-01T09:05:00Z,bob,login,10.0.0.5,failed,yes
+2026-10-01T09:06:00Z,bob,login,10.0.0.5,success,yes
+2026-10-01T09:30:00Z,carol,ListBuckets,10.0.0.6,success,yes

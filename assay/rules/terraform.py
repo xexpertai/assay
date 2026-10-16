@@ -25,7 +25,13 @@ SECRET_KEY_RE = re.compile(r"(?i)(password|passwd|secret|token|api_?key|access_?
 def _f(block: Block, rel: str, **kw) -> Finding:
     kw.setdefault("line", block.line)
     kw.setdefault("resource", block.address)
-    return Finding(file=rel, **kw)
+    resolved = sorted({a.resolved_from for a in block.attrs.values() if a.resolved_from}
+                      | {a.resolved_from for c in block.blocks for a in c.attrs.values() if a.resolved_from})
+    f = Finding(file=rel, **kw)
+    if resolved:
+        f.meta["resolved"] = resolved
+        f.evidence += " [resolved: " + "; ".join(resolved) + "]"
+    return f
 
 
 def _set_fix(block: Block, rel: str, attr: str, value: str, attrs: dict | None = None) -> dict:
@@ -206,6 +212,13 @@ def _has_companion(all_blocks: list[Block], rtype: str, target: Block) -> bool:
     return False
 
 
+RESOURCE_POLICY_TYPES = {
+    "aws_sqs_queue_policy": "SQS queue", "aws_sns_topic_policy": "SNS topic", "aws_kms_key": "KMS key",
+    "aws_ecr_repository_policy": "ECR repository", "aws_secretsmanager_secret_policy": "Secrets Manager secret",
+    "aws_glacier_vault": "Glacier vault", "aws_elasticsearch_domain_policy": "OpenSearch domain",
+    "aws_opensearch_domain_policy": "OpenSearch domain", "aws_lambda_permission": "Lambda", "aws_efs_file_system_policy": "EFS",
+    "aws_ses_identity_policy": "SES identity",
+}
 PAB_FLAGS = ("block_public_acls", "block_public_policy", "ignore_public_acls", "restrict_public_buckets")
 
 
@@ -298,6 +311,24 @@ def _principal_any_conditioned(text: str, every: list[Block] | None = None) -> b
     return bool(hits) and all("Condition" in st for st in hits)
 
 
+def _launch_template_has_role(instance: Block, every: list[Block]) -> bool:
+    for r in references(instance):
+        if r.startswith("aws_launch_template."):
+            for x in every:
+                if x.address == r and (x.get("iam_instance_profile") is not None or x.children("iam_instance_profile")):
+                    return True
+    return False
+
+
+def _pab_all_true(every: list[Block], bucket_addr: str) -> bool:
+    """True when an aws_s3_bucket_public_access_block for the bucket sets all four flags to literal true."""
+    for x in every:
+        if x.type == "resource" and x.labels and x.labels[0] == "aws_s3_bucket_public_access_block" \
+                and bucket_addr in references(x) and all(is_true(x.get(k)) for k in PAB_FLAGS):
+            return True
+    return False
+
+
 def _iam_wildcard(text: str) -> bool:
     t = re.sub(r"\s+", "", text)
     action_star = re.search(r'"?[Aa]ctions?"?[:=]\[?"\*"', t) is not None
@@ -307,8 +338,12 @@ def _iam_wildcard(text: str) -> bool:
 
 
 def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None = None) -> list[Finding]:
-    blocks = parse(text)
-    every = [b for _, b in blocks_all] if blocks_all else blocks
+    if blocks_all is not None:  # pre-parsed (and variable-resolved) by parse_all
+        blocks = [b for r, b in blocks_all if r == rel]
+        every = [b for _, b in blocks_all]
+    else:
+        blocks = parse(text)
+        every = blocks
     out: list[Finding] = []
     for b in blocks:
         if b.type == "provider":
@@ -325,6 +360,24 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
         if b.type != "resource" or len(b.labels) != 2:
             continue
         rtype = b.labels[0]
+
+        if rtype in RESOURCE_POLICY_TYPES:  # independent of the per-type chain below (aws_kms_key has both)
+            pol = b.attrs.get("policy") or b.attrs.get("access_policy")
+            if pol and _principal_any(pol.value, every):
+                cond = _principal_any_conditioned(pol.value, every)
+                target = next((r for r in references(b) if not r.startswith("data.")), b.address)
+                out.append(_f(b, rel, line=pol.line, resource=target, rule_id="TF-AWS-RESOURCE-POLICY-PUBLIC",
+                              title=f"{RESOURCE_POLICY_TYPES[rtype]} policy grants access to everyone (Principal \"*\")",
+                              severity="high", confidence="medium" if cond else "high",
+                              evidence='Effect "Allow" with Principal "*"' + (" (a Condition narrows it; check it)"
+                                                                            if cond else ""),
+                              rationale="A wildcard principal lets any AWS account, and for some services anonymous "
+                                        "callers, use this resource: read the queue or topic, use the key, pull the "
+                                        "image or read the secret.",
+                              remediation="Name the accounts or roles that need access; add aws:SourceAccount / "
+                                          "aws:SourceArn conditions for service principals.",
+                              cwe="CWE-284", category="resource_policy_public",
+                              tags=["internet-exposed", "privilege", "data-store"]))
 
         if rtype == "aws_s3_bucket":
             acl = unquote(b.get("acl")) or ""
@@ -423,16 +476,24 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
             pol = b.attrs.get("policy")
             if pol and _principal_any(pol.value, every):
                 cond = _principal_any_conditioned(pol.value, every)
-                out.append(_f(b, rel, line=pol.line, resource=_bucket_of(b), rule_id="TF-AWS-S3-POLICY-PUBLIC",
-                              title="S3 bucket policy grants access to everyone (Principal \"*\")",
-                              severity="high", confidence="medium" if cond else "high",
-                              evidence='Effect "Allow" with Principal "*"' + (" (a Condition narrows it; check it)"
-                                                                            if cond else ""),
+                bucket = _bucket_of(b)
+                blocked = _pab_all_true(every, bucket)
+                sev = "info" if blocked and cond else "low" if blocked else "high"
+                ev = 'Effect "Allow" with Principal "*"' + (" (a Condition narrows it; check it)" if cond else "")
+                if blocked:
+                    ev += "; blocked by the bucket's public access block (all four settings true), so the policy " \
+                          "cannot grant public access unless that block is removed"
+                out.append(_f(b, rel, line=pol.line, resource=bucket, rule_id="TF-AWS-S3-POLICY-PUBLIC",
+                              title="S3 bucket policy grants access to everyone (Principal \"*\")"
+                                    + (" but the public access block stops it" if blocked else ""),
+                              severity=sev, confidence="medium" if cond else "high",
+                              evidence=ev,
                               rationale="A wildcard principal makes the bucket readable (or writable) by any AWS "
                                         "account and, for s3:GetObject, by anonymous internet users.",
                               remediation="Name specific principals, or serve public content through CloudFront "
                                           "with an origin access control.",
-                              cwe="CWE-284", category="s3_public", tags=["internet-exposed", "data-store"]))
+                              cwe="CWE-284", category="s3_public",
+                              tags=["data-store"] if blocked else ["internet-exposed", "data-store"]))
         elif rtype == "aws_iam_role":
             pol = b.attrs.get("assume_role_policy")
             if pol and _principal_any(pol.value, every):
@@ -465,9 +526,14 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
                               category="internet_facing", tags=["internet-exposed"]))
             meta = b.children("metadata_options")
             if rtype == "aws_instance" and not any(unquote(m.get("http_tokens")) == "required" for m in meta):
+                literal_optional = any(unquote(m.get("http_tokens")) == "optional" for m in meta)
+                has_role = b.get("iam_instance_profile") is not None or _launch_template_has_role(b, every)
                 out.append(_f(b, rel, rule_id="TF-AWS-EC2-IMDSV1",
-                              title="Instance metadata service allows IMDSv1", severity="low", confidence="medium",
-                              evidence='metadata_options.http_tokens is not "required"',
+                              title="Instance metadata service allows IMDSv1", severity="low",
+                              confidence="high" if literal_optional else "medium",
+                              evidence='metadata_options.http_tokens = "optional"' if literal_optional else
+                              'no metadata_options.http_tokens = "required" (AWS default allows IMDSv1)',
+                              meta={"has_role": has_role},
                               rationale="IMDSv1 lets a server-side request forgery bug steal the instance role "
                                         "credentials.",
                               remediation='Add metadata_options { http_tokens = "required" }.',
@@ -629,8 +695,168 @@ def analyse_file(rel: str, text: str, blocks_all: list[tuple[str, Block]] | None
     return out
 
 
-def parse_all(files: list[tuple[str, str]]) -> list[tuple[str, Block]]:
+TFVARS_LINE_RE = re.compile(r'^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.+?)\s*$')
+VAR_REF_RE = re.compile(r"\bvar\.([A-Za-z_][A-Za-z0-9_-]*)\b")
+TERNARY_RE = re.compile(r"^\s*(!?)\s*var\.([A-Za-z_][A-Za-z0-9_-]*)\s*\?\s*(.+?)\s*:\s*(.+?)\s*$")
+
+
+def variable_values(files: list[tuple[str, str]], apply_defaults: bool = True,
+                    overrides: dict | None = None) -> dict[str, tuple[str, str]]:
+    """name -> (literal value, source) for one module directory.
+
+    Sources, in increasing precedence: `variable "x" { default = ... }`, then terraform.tfvars /
+    *.auto.tfvars (what Terraform itself applies automatically). Only literal values are kept, so a
+    default that is itself an expression is ignored. Values set on the command line or by TF_VAR_*
+    environment variables are unknown to Assay; a resolved value is reported with its source.
+    """
+    values: dict[str, tuple[str, str]] = {}
+    for rel, text in files:
+        if rel.endswith(".tf") and apply_defaults:
+            for b in parse(text):
+                if b.type == "variable" and len(b.labels) == 1:
+                    d = b.get("default")
+                    if d is not None and _literal(d):
+                        values[b.labels[0]] = (d.strip(), f"default in {rel.rsplit('/', 1)[-1]}")
+    for rel, text in files:
+        name = rel.rsplit("/", 1)[-1]
+        if name == "terraform.tfvars" or name.endswith(".auto.tfvars"):
+            for line in text.splitlines():
+                m = TFVARS_LINE_RE.match(line.split("#")[0].split("//")[0])
+                if m and _literal(m.group(2)):
+                    values[m.group(1)] = (m.group(2).strip(), name)
+    for k, v in (overrides or {}).items():  # values passed by a module caller win; None = known unresolvable
+        if v is None:
+            values.pop(k, None)
+        else:
+            values[k] = v
+    return values
+
+
+def _resolve_expr(expr: str, values: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
+    """Resolve `var.x`, `!var.x` and `var.x ? a : b` (literal a/b) to a literal; else None."""
+    e = expr.strip()
+    m = re.fullmatch(r"(!?)\s*var\.([A-Za-z_][A-Za-z0-9_-]*)", e)
+    if m and m.group(2) in values:
+        v, src = values[m.group(2)]
+        if m.group(1):
+            if v in ("true", "false"):
+                return ("false" if v == "true" else "true"), f"!var.{m.group(2)} ({src})"
+            return None
+        return v, f"var.{m.group(2)} ({src})"
+    m = TERNARY_RE.match(e)
+    if m and m.group(2) in values and _literal(m.group(3)) and _literal(m.group(4)):
+        v, src = values[m.group(2)]
+        if v in ("true", "false"):
+            truth = (v == "true") != bool(m.group(1))
+            return (m.group(3) if truth else m.group(4)).strip(), f"{m.group(1)}var.{m.group(2)} ? … ({src})"
+    # lists and strings that only embed variable references, e.g. cidr_blocks = [var.cidr]
+    used = [n for n in VAR_REF_RE.findall(e) if n in values]
+    if used:
+        sub = VAR_REF_RE.sub(lambda mm: values[mm.group(1)][0] if mm.group(1) in values else mm.group(0), e)
+        if sub != e and _literal(sub):
+            return sub, ", ".join(f"var.{n} ({values[n][1]})" for n in dict.fromkeys(used))
+    return None
+
+
+def resolve_variables(blocks: list[Block], values: dict[str, tuple[str, str]]) -> int:
+    """Substitute resolvable variable references in place; returns how many attributes were resolved."""
+    n = 0
+
+    def walk(b: Block) -> None:
+        nonlocal n
+        if b.type == "variable":
+            return
+        for a in b.attrs.values():
+            if a.resolved_from or "var." not in a.value:
+                continue
+            r = _resolve_expr(a.value, values)
+            if r:
+                a.value, a.resolved_from = r
+                n += 1
+        for c in b.blocks:
+            walk(c)
+
+    for b in blocks:
+        walk(b)
+    return n
+
+
+def module_target(rel: str, src: str | None) -> str | None:
+    """Directory (relative to the scan root, POSIX) a `module` block's local source points at, else None."""
+    if not src or not src.startswith("."):
+        return None
+    base = rel.rsplit("/", 1)[0] if "/" in rel else ""
+    stack: list[str] = []
+    for p in (base.split("/") if base else []) + src.split("/"):
+        if p == "..":
+            if stack:
+                stack.pop()
+        elif p and p != ".":
+            stack.append(p)
+    return "/".join(stack)
+
+
+def module_sources(files: list[tuple[str, str]]) -> set[str]:
+    """Directories (relative to the scan root, POSIX) that `module` blocks point at with a local source."""
+    out = set()
+    for rel, text in files:
+        if not rel.endswith(".tf"):
+            continue
+        for b in parse(text):
+            if b.type == "module":
+                t = module_target(rel, unquote(b.get("source")))
+                if t is not None:
+                    out.add(t)
+    return out
+
+
+MODULE_META_ARGS = {"source", "version", "count", "for_each", "providers", "depends_on"}
+
+
+def module_overrides(calls: list[tuple[str, Block]], declared: set[str]) -> tuple[dict, list[tuple[str, str]]]:
+    """Variable values for a module directory from the module blocks that call it (one level).
+
+    Returns (overrides, notes). overrides[var] = (literal, source) when every caller passes the same literal,
+    or None when callers pass an expression or disagree (the variable must then stay unresolved, even if the
+    module declares a default). Variables no caller passes keep their default. notes explain each None.
+    """
+    seen: dict[str, list[tuple[str, str, Block, str]]] = {}
+    for rel, b in calls:
+        for k, a in b.attrs.items():
+            if k in MODULE_META_ARGS or k not in declared:
+                continue
+            seen.setdefault(k, []).append((rel, a.value.strip(), b, a.resolved_from))
+    ov: dict[str, tuple[str, str] | None] = {}
+    notes: list[tuple[str, str]] = []
+    for k, items in seen.items():
+        vals = {v for _, v, _, _ in items}
+        rel, v, b, via = items[0]
+        name = ".".join(["module", *b.labels])
+        if len(vals) == 1 and _literal(v):
+            ov[k] = (v, f"argument of {name} in {rel.rsplit('/', 1)[-1]}" + (f", resolved from {via}" if via else ""))
+        else:
+            ov[k] = None
+            why = "callers pass different values" if len(vals) > 1 else f"it is the expression {v[:60]}"
+            notes.append((rel, f"{name} passes {k} to a module Assay analyses, but {why}: the value comes from "
+                               f"the module caller and is not followed, so var.{k} stays unresolved"))
+    return ov, notes
+
+
+def parse_all(files: list[tuple[str, str]], resolve: bool = True, apply_defaults: bool = True,
+              overrides: dict | None = None) -> list[tuple[str, Block]]:
+    """Parse one module directory; resolve tfvars and, for a root module, literal variable defaults.
+
+    A directory that another directory uses as a `module` source gets its real values from the caller,
+    which Assay does not follow, so its defaults are NOT applied there (apply_defaults=False keeps the
+    expression-based medium/low-confidence findings instead of trusting a possibly overridden default).
+    """
+    values = variable_values(files, apply_defaults, overrides) if resolve else {}
     blocks: list[tuple[str, Block]] = []
     for rel, text in files:
-        blocks += [(rel, b) for b in parse(text)]
+        if not rel.endswith(".tf"):
+            continue
+        parsed = parse(text)
+        if values:
+            resolve_variables(parsed, values)
+        blocks += [(rel, b) for b in parsed]
     return blocks

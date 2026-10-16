@@ -1,0 +1,13 @@
+analytics:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: acme-xy12345
+      user: dbt_prod
+      password: "Sn0wfl4ke!Prod#2026"
+      role: TRANSFORMER
+      warehouse: TRANSFORMING
+      database: ANALYTICS
+      schema: PUBLIC
+      threads: 8

@@ -20,8 +20,8 @@ from .narrate import narrate
 from .plugins import ALL_TEXT, plan as make_plan, registry
 from .scope import Scope, ScopePolicy
 
-TEXT_KINDS = {"terraform", "kubernetes", "dockerfile", "compose", "gha", "env", "requirements", "yaml", "other",
-              "nmap", "nuclei", "trivy"}
+TEXT_KINDS = {"terraform", "tfvars", "kubernetes", "dockerfile", "compose", "gha", "env", "requirements", "yaml", "other",
+              "nmap", "nuclei", "trivy", "eventlog", "eventlog-unparsed", "airflow-config", "airflow-dag", "dbt-profile", "sql", "kafka"}
 TEXT_SUFFIXES = {".tf", ".yml", ".yaml", ".json", ".env", ".sh", ".py", ".js", ".ts", ".txt", ".cfg", ".ini",
                  ".conf", ".properties", ".toml", ".xml", ".pem", ".key", ".php", ".go", ".rb", ".java", ""}
 
@@ -39,11 +39,14 @@ class Result:
     timings: dict = field(default_factory=dict)
     policy: dict = field(default_factory=dict)
     plan_entries: list = field(default_factory=list)
+    diff: dict | None = None  # baseline comparison, when --baseline was given
 
 
 def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url: str | None = None,
-        max_files: int = 5000, policy: ScopePolicy | None = None) -> Result:
+        max_files: int = 5000, policy: ScopePolicy | None = None, baseline: Path | None = None) -> Result:
+    from .baseline import diff as diff_findings, load_baseline
     t0 = time.perf_counter()
+    base_data = load_baseline(baseline) if baseline else None  # fail early, before any work
     decisions: list[Decision] = []
     scope = Scope.from_target(target)  # raises on network targets
     policy = policy or ScopePolicy.files_only()
@@ -63,11 +66,19 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
         decisions.append(Decision("scope", "policy files-only", "no host is in scope; tool output files are read as "
                                   "local evidence only; no active step can be authorised"))
 
-    inv = build_inventory(scope)
+    oversize: list[tuple[str, str]] = []
+    inv = build_inventory(scope, oversize)
+    for rel, why in oversize:
+        decisions.append(Decision("recon", f"skipped {rel}", why))
     if len(inv) > max_files:
         decisions.append(Decision("recon", f"truncated inventory to {max_files} files", "file budget reached"))
         inv = inv[:max_files]
     kinds = Counter(a.kind for a in inv)
+    for a in inv:
+        if a.kind == "eventlog-unparsed":
+            decisions.append(Decision("recon", f"skipped {a.path}: looks like an event log but could not be parsed",
+                                      "the name and vocabulary suggest CloudTrail/auth events, but no record with a time "
+                                      "and an action field could be read; supply a field mapping or convert to JSONL/CSV"))
     decisions.append(Decision("recon", f"inventoried {len(inv)} files",
                               ", ".join(f"{k}: {v}" for k, v in sorted(kinds.items()))))
     if log:
@@ -109,6 +120,8 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
         ran += 1
     for rel, host, why in facts.dropped:
         decisions.append(Decision("analyse", f"ignored evidence about {host} in {rel}", why))
+    for rel, why in facts.skipped:
+        decisions.append(Decision("analyse", f"skipped part of {rel}", why))
     # de-duplicate by id
     findings = list({f.id: f for f in findings}.values())
     decisions.append(Decision("analyse", f"{len(findings)} findings from {ran} analysers",
@@ -131,13 +144,21 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
 
     counts = {"files": len(inv), "findings": len(findings), "chains": len(chains),
               "by_severity": dict(Counter(f.severity for f in findings))}
+    diff_result = None
+    if base_data is not None:
+        diff_result = diff_findings(findings, base_data, baseline)
+        decisions.append(Decision("compare", f"{len(diff_result['new'])} new, {len(diff_result['fixed'])} fixed, "
+                                  f"{diff_result['unchanged']} unchanged, {diff_result['moved']} moved",
+                                  f"compared with baseline {baseline} ({diff_result['baseline_findings']} findings, "
+                                  f"sha256 {diff_result['baseline_sha256'][:12]}); matched by id, then by "
+                                  "line-independent fingerprint"))
     narrative = narrate(findings, chains, counts, use_llm, llm_url)
     decisions.append(Decision("report", f"briefing written by {narrative['author']}",
                               "; ".join(narrative["validation"]) or "passed grounding checks"))
 
     res = Result(str(scope.root), [a.__dict__ for a in inv], decisions, findings, chains, actions, narrative,
                  counts, {"total_s": round(time.perf_counter() - t0, 2)}, policy.to_dict(),
-                 [e.__dict__ for e in plan_entries])
+                 [e.__dict__ for e in plan_entries], diff_result)
     if out_dir:
         write_outputs(res, out_dir, log)
     return res
@@ -152,7 +173,7 @@ def write_outputs(res: Result, out_dir: Path, log: AuditLog) -> None:
             "actions": [{**a.to_dict(), "fix": fix_by_id[a.finding_id]} for a in res.actions]}
     (out_dir / "plan.json").write_text(json.dumps(plan, indent=2))
     data = {"assay_version": __version__, "scope_root": res.scope_root, "policy": res.policy,
-            "plan": res.plan_entries, "counts": res.counts,
+            "plan": res.plan_entries, "counts": res.counts, "diff": res.diff,
             "decisions": [d.to_dict() for d in res.decisions], "chains": [c.to_dict() for c in res.chains],
             "findings": [f.to_dict() for f in res.findings], "narrative": res.narrative,
             "plan_sha256": plan_hash(plan), "timings": res.timings}

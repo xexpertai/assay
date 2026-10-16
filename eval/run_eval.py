@@ -43,8 +43,10 @@ def fixtures() -> dict:
             shutil.copytree(case, dst, ignore=shutil.ignore_patterns("expected.json"))
             res = run(str(dst))
         got = {f.rule_id for f in res.findings}
-        want_conf = json.loads((case / "expected.json").read_text()).get("confidence", {})
-        conf_ok = all(any(f.rule_id == r and f.confidence == c for f in res.findings) for r, c in want_conf.items())
+        spec = json.loads((case / "expected.json").read_text())
+        conf_ok = all(any(f.rule_id == r and f.confidence == c for f in res.findings)
+                      for r, c in spec.get("confidence", {}).items()) and \
+            all(any(f.rule_id == r and f.severity == v for f in res.findings) for r, v in spec.get("severity", {}).items())
         c_tp, c_fp, c_fn = expected & got, got - expected, expected - got
         tp, fp, fn = tp + len(c_tp), fp + len(c_fp), fn + len(c_fn)
         for r in c_fp:

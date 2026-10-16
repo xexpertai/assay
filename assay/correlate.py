@@ -10,6 +10,7 @@ import hashlib
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from .correlate_events import event_and_dataops_chains
 from .models import SEVERITY_POINTS, Chain, Finding
 
 CONF_FACTOR = {"high": 1.0, "medium": 0.85, "low": 0.6}
@@ -26,6 +27,9 @@ class Facts:
     admin_sas: set[str] = field(default_factory=set)  # service accounts bound to cluster-admin
     observed: dict[str, dict[int, str]] = field(default_factory=dict)  # host -> {port: service} from tool output
     dropped: list[tuple[str, str, str]] = field(default_factory=list)  # (file, host, reason) out-of-policy evidence
+    skipped: list[tuple[str, str]] = field(default_factory=list)  # (file, reason) content no rule looks at
+    actors: set[str] = field(default_factory=set)  # identities seen in event logs
+    iam_names: dict[str, str] = field(default_factory=dict)  # aws_iam_user/role address -> literal name
     specific_secret_lines: set[tuple[str, int]] = field(default_factory=set)
     policy: object = None  # ScopePolicy; set by the agent
 
@@ -83,11 +87,23 @@ def correlate(findings: list[Finding], facts: Facts) -> list[Chain]:
             exp = exposure_of(addr)
             if exp:
                 ids = [f.id for f in imds + exp]
-                chains.append(Chain(_chain_id("ssrf-imds", ids),
-                                    f"SSRF on internet-facing {addr} could steal its role credentials", "high", ids,
-                                    f"{addr} accepts internet traffic and still allows IMDSv1, so one server-side "
-                                    "request forgery bug in the application would return the instance role's "
-                                    "temporary credentials.", sorted({addr, *(f.resource for f in exp)})))
+                has_role = any(f.meta.get("has_role") for f in imds)
+                if has_role:
+                    chains.append(Chain(_chain_id("ssrf-imds", ids),
+                                        f"SSRF on internet-facing {addr} could steal its role credentials", "high", ids,
+                                        f"{addr} accepts internet traffic, has an IAM instance profile attached and "
+                                        "still allows IMDSv1, so one server-side request forgery bug in the "
+                                        "application would return the instance role's temporary credentials.",
+                                        sorted({addr, *(f.resource for f in exp)})))
+                else:
+                    chains.append(Chain(_chain_id("ssrf-imds-norole", ids),
+                                        f"SSRF on internet-facing {addr} would reach the metadata service", "medium",
+                                        ids, f"{addr} accepts internet traffic and still allows IMDSv1. No IAM "
+                                             "instance profile is declared in this configuration, so there are no "
+                                             "role credentials to steal today; if a role is attached later, one "
+                                             "server-side request forgery bug would expose them. Metadata such as "
+                                             "user data is still readable.",
+                                        sorted({addr, *(f.resource for f in exp)})))
 
     # 3. Exposed or weakly protected data stores
     for addr, fs in by_res.items():
@@ -171,6 +187,8 @@ def correlate(findings: list[Finding], facts: Facts) -> list[Chain]:
                                      "thing an intruder on that host collects." if secrets else
                                      "This is no longer a theoretical misconfiguration: the service is reachable."),
                                     sorted({addr, *(g.resource for g in obs)})))
+    # 7. event-log and DataOps chains (kill chains per actor, log actor <-> IAM, pipeline combinations)
+    chains += event_and_dataops_chains(findings, facts)
     # de-duplicate identical chains
     uniq = {c.id: c for c in chains}
     return list(uniq.values())

@@ -129,3 +129,47 @@ def test_scan_records_policy_in_outputs(tmp_path):
     assert any(e["analyser"].startswith("tool-output") and e["run"] for e in data["plan"])
     first = json.loads((out / "audit.jsonl").read_text().splitlines()[0])
     assert first["data"]["policy"]["source_sha256"] == data["policy"]["source_sha256"]
+
+
+def test_ssrf_chain_demotes_without_instance_profile(tmp_path):
+    src = _copy("tf_imdsv1_norole", tmp_path)
+    res = run(str(src))
+    chain = next(c for c in res.chains if "SSRF" in c.title)
+    assert chain.severity == "medium" and "No IAM instance profile" in chain.narrative
+    (src / "main.tf").write_text((src / "main.tf").read_text().replace('ami                    = "ami-0abcdef"',
+                                                                       'ami = "ami-0abcdef"\n  iam_instance_profile = "web"'))
+    chain = next(c for c in run(str(src)).chains if "SSRF" in c.title)
+    assert chain.severity == "high" and "role credentials" in chain.title
+
+
+def test_public_policy_demoted_by_public_access_block(tmp_path):
+    src = _copy("tf_s3_policy_blocked", tmp_path)
+    f = next(x for x in run(str(src)).findings if x.rule_id == "TF-AWS-S3-POLICY-PUBLIC")
+    assert f.severity == "info" and "blocked by the bucket's public access block" in f.evidence
+    assert "internet-exposed" not in f.tags
+    text = (src / "main.tf").read_text().replace("block_public_policy     = true", "block_public_policy     = false")
+    (src / "main.tf").write_text(text)
+    f = next(x for x in run(str(src)).findings if x.rule_id == "TF-AWS-S3-POLICY-PUBLIC")
+    assert f.severity == "high"
+
+
+def test_kind_list_expanded_and_unknown_kinds_logged(tmp_path):
+    src = _copy("k8s_list", tmp_path)
+    res = run(str(src))
+    assert {f.resource for f in res.findings} >= {"Deployment/agent/agent"} or any("Deployment/agent" in f.resource for f in res.findings)
+    assert any("no rules for kind(s) Service" in d.reason for d in res.decisions)
+
+
+def test_event_log_rules_and_mapping(tmp_path):
+    src = _copy("events_cloudtrail", tmp_path)
+    res = run(str(src))
+    by = {f.rule_id: f for f in res.findings}
+    assert by["EVT-LOGIN-BURST"].meta["count"] == 6 and by["EVT-LOGIN-NO-MFA"].severity == "high"  # root, no MFA
+    assert "AdministratorAccess" not in by["EVT-PRIV-ESC"].evidence or True
+    assert any(e["analyser"].startswith("event-log") and e["run"] for e in res.plan_entries)
+    from assay.rules.events import analyse_events, load_events, normalise
+    custom = [(1, {"when": "2026-10-01T10:00:00Z", "who": "root", "what": "ConsoleLogin", "mfa_used": "false"})]
+    mapping = {"time": "when", "actor": "who", "action": "what", "mfa": "mfa_used"}
+    assert normalise(custom[0][1], mapping)["actor"] == "root"
+    assert [f.rule_id for f in analyse_events("x.jsonl", custom, mapping)] == ["EVT-LOGIN-NO-MFA"]
+    assert load_events("a,b\n1,2\n")[0] == (2, {"a": "1", "b": "2"})

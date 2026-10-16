@@ -303,10 +303,13 @@
   {
    "module": "ecr",
    "flag": "ecr_repo_public",
-   "kind": "none",
+   "kind": "literal",
    "file": "modules/aws/ecr/main.tf",
-   "resource": "aws_ecr_repository_policy.mainecrpolicy",
-   "accept": []
+   "resource": "aws_ecr_repository.main",
+   "accept": [
+    "TF-AWS-RESOURCE-POLICY-PUBLIC"
+   ],
+   "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures"
   },
   {
    "module": "eks",
@@ -388,10 +391,13 @@
   {
    "module": "glacier",
    "flag": "glacier_public",
-   "kind": "none",
+   "kind": "literal",
    "file": "modules/aws/glacier/main.tf",
    "resource": "aws_glacier_vault.main",
-   "accept": []
+   "accept": [
+    "TF-AWS-RESOURCE-POLICY-PUBLIC"
+   ],
+   "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result)"
   },
   {
    "module": "iam",
@@ -535,11 +541,13 @@
   {
    "module": "kms",
    "flag": "kms_key_exposed",
-   "kind": "none",
+   "kind": "literal",
    "file": "modules/aws/kms/main.tf",
    "resource": "aws_kms_key.exposed",
-   "accept": [],
-   "note": "key policy with a wildcard principal; Assay checks bucket and assume-role policies only"
+   "accept": [
+    "TF-AWS-RESOURCE-POLICY-PUBLIC"
+   ],
+   "note": "key policy with a wildcard principal; Assay checks bucket and assume-role policies only; post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result)"
   },
   {
    "module": "lightsail",
@@ -729,26 +737,35 @@
   {
    "module": "ses",
    "flag": "identity_world_policy",
-   "kind": "none",
+   "kind": "literal",
    "file": "modules/aws/ses/main.tf",
-   "resource": "aws_ses_identity_policy.main",
-   "accept": []
+   "resource": "aws_ses_domain_identity.main",
+   "accept": [
+    "TF-AWS-RESOURCE-POLICY-PUBLIC"
+   ],
+   "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures"
   },
   {
    "module": "sns",
    "flag": "topic_world_policy",
-   "kind": "none",
+   "kind": "literal",
    "file": "modules/aws/sns/main.tf",
-   "resource": "aws_sns_topic_policy.main-policy",
-   "accept": []
+   "resource": "aws_sns_topic.main",
+   "accept": [
+    "TF-AWS-RESOURCE-POLICY-PUBLIC"
+   ],
+   "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures"
   },
   {
    "module": "sqs",
    "flag": "queue_world_policy",
-   "kind": "none",
+   "kind": "literal",
    "file": "modules/aws/sqs/main.tf",
-   "resource": "aws_sqs_queue_policy.main",
-   "accept": []
+   "resource": "aws_sqs_queue.main",
+   "accept": [
+    "TF-AWS-RESOURCE-POLICY-PUBLIC"
+   ],
+   "note": "post-blind: resource-policy rule added on 16 Oct (counted as 'no rule' in the frozen blind result); finding attaches to the resource the policy configures"
   },
   {
    "module": "sqs",

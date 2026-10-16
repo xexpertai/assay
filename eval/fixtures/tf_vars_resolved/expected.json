@@ -1,0 +1,1 @@
+{"expect":["TF-AWS-DB-PUBLIC","TF-AWS-SG-OPEN-DATA","TF-AWS-EBS-UNENCRYPTED"],"confidence":{"TF-AWS-DB-PUBLIC":"high","TF-AWS-SG-OPEN-DATA":"high"}}
