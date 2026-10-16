@@ -1,6 +1,6 @@
 [project]
 name = "assay"
-version = "0.3.0"
+version = "0.4.0"
 description = "Assay: an explainable, approval-gated security assessment agent for infrastructure-as-code, containers, CI and secrets"
 readme = "README.md"
 license = "MIT"

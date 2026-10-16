@@ -1,0 +1,142 @@
+{
+  "Records": [
+    {
+      "eventTime": "2026-10-02T08:00:00Z",
+      "eventName": "DescribeInstances",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/ci-bot"
+      },
+      "sourceIPAddress": "10.0.0.5"
+    },
+    {
+      "eventTime": "2026-10-02T08:10:00Z",
+      "eventName": "DescribeInstances",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/ci-bot"
+      },
+      "sourceIPAddress": "10.0.0.5"
+    },
+    {
+      "eventTime": "2026-10-02T08:20:00Z",
+      "eventName": "DescribeInstances",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/ci-bot"
+      },
+      "sourceIPAddress": "10.0.0.5"
+    },
+    {
+      "eventTime": "2026-10-02T10:00:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:01:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:02:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:03:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:04:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:05:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Failure"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:07:00Z",
+      "eventName": "ConsoleLogin",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "responseElements": {
+        "ConsoleLogin": "Success"
+      },
+      "additionalEventData": {
+        "MFAUsed": "No"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:09:00Z",
+      "eventName": "AttachUserPolicy",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "requestParameters": {
+        "userName": "alice",
+        "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:10:00Z",
+      "eventName": "CreateAccessKey",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "requestParameters": {
+        "userName": "alice"
+      }
+    },
+    {
+      "eventTime": "2026-10-02T10:11:00Z",
+      "eventName": "StopLogging",
+      "userIdentity": {
+        "arn": "arn:aws:iam::123456789012:user/alice"
+      },
+      "sourceIPAddress": "203.0.113.9",
+      "requestParameters": {
+        "name": "main-trail"
+      }
+    }
+  ]
+}

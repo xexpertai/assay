@@ -16,6 +16,7 @@ from .actions import AuditLog, plan_hash, propose
 from .correlate import Facts, correlate, prioritise
 from .inventory import build_inventory
 from .models import Chain, Decision, Finding
+from .planner import order_analysers, propose_steps
 from .narrate import narrate
 from .plugins import ALL_TEXT, plan as make_plan, registry
 from .scope import Scope, ScopePolicy
@@ -40,10 +41,12 @@ class Result:
     policy: dict = field(default_factory=dict)
     plan_entries: list = field(default_factory=list)
     diff: dict | None = None  # baseline comparison, when --baseline was given
+    proposed_steps: list = field(default_factory=list)  # active steps the LLM planner proposed (planned, not approved)
 
 
 def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url: str | None = None,
-        max_files: int = 5000, policy: ScopePolicy | None = None, baseline: Path | None = None) -> Result:
+        max_files: int = 5000, policy: ScopePolicy | None = None, baseline: Path | None = None,
+        planner_url: str | None = None) -> Result:
     from .baseline import diff as diff_findings, load_baseline
     t0 = time.perf_counter()
     base_data = load_baseline(baseline) if baseline else None  # fail early, before any work
@@ -87,6 +90,8 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
     # ---- plan: pick analysers from what recon found (every run and skip has a reason)
     analysers = registry()
     plan_entries = make_plan(analysers, kinds)
+    if planner_url:
+        analysers, plan_entries = order_analysers(analysers, plan_entries, kinds, planner_url, log, decisions)
     for e in plan_entries:
         decisions.append(Decision("plan", f"{'run' if e.run else 'skip'} {e.analyser}", e.reason
                                   + ("" if e.origin == "built-in" else f" [{e.origin}]")))
@@ -137,6 +142,8 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
     decisions.append(Decision("prioritise", "ranked findings by explained score",
                               "severity x confidence, +1 if internet-exposed, +1.5 if part of a chain"))
 
+    proposed_steps = propose_steps(policy, facts.observed, findings, out_dir, str(scope.root), planner_url, log,
+                                   decisions)
     # ---- propose (never apply)
     actions = propose(findings, scope)
     decisions.append(Decision("act", f"proposed {len(actions)} mechanical patch(es); applied 0",
@@ -158,7 +165,7 @@ def run(target: str, out_dir: Path | None = None, use_llm: bool = False, llm_url
 
     res = Result(str(scope.root), [a.__dict__ for a in inv], decisions, findings, chains, actions, narrative,
                  counts, {"total_s": round(time.perf_counter() - t0, 2)}, policy.to_dict(),
-                 [e.__dict__ for e in plan_entries], diff_result)
+                 [e.__dict__ for e in plan_entries], diff_result, proposed_steps)
     if out_dir:
         write_outputs(res, out_dir, log)
     return res
@@ -176,7 +183,8 @@ def write_outputs(res: Result, out_dir: Path, log: AuditLog) -> None:
             "plan": res.plan_entries, "counts": res.counts, "diff": res.diff,
             "decisions": [d.to_dict() for d in res.decisions], "chains": [c.to_dict() for c in res.chains],
             "findings": [f.to_dict() for f in res.findings], "narrative": res.narrative,
-            "plan_sha256": plan_hash(plan), "timings": res.timings}
+            "plan_sha256": plan_hash(plan), "timings": res.timings,
+            "proposed_steps": res.proposed_steps}
     (out_dir / "findings.json").write_text(json.dumps(data, indent=2))
     (out_dir / "report.md").write_text(to_markdown(res))
     (out_dir / "report.sarif").write_text(json.dumps(to_sarif(res), indent=2))

@@ -1,0 +1,1 @@
+Fictional demo data for scripts/demo-dataops.sh: documentation IP ranges (203.0.113.0/24, 198.51.100.0/24), the AWS documentation account 123456789012, and invented passwords. Nothing here is a real log or system.

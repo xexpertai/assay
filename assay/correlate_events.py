@@ -77,7 +77,7 @@ def _timeline(fs: list[Finding]) -> str:
     for f in fs:
         t = f.meta.get("time", "")
         rows.append(f"{t[11:19] or '??:??:??'} line {f.line}: {f.title}")
-    return "Timeline: " + " -> ".join(rows) + "."
+    return "Timeline:\n" + "\n".join(f"  {i}. {r}" for i, r in enumerate(rows, 1))
 
 
 def _kill_chains(evt: list[Finding]) -> list[Chain]:

@@ -72,6 +72,8 @@ uv run assay apply runs/myrepo             # applies only A-01; refuses if anyth
 uv run assay verify-log runs/myrepo        # hash chain + HMAC under the per-run key in ~/.config/assay/keys
 uv run assay scan lab-repo --lab lab.json  # lab allowlist: see docs/lab.example.json
 uv run assay scan path/to/repo --llm --llm-url http://127.0.0.1:8080   # optional local-model briefing
+uv run assay ui runs/myrepo               # read-only local web page: findings, chains, pending approvals (127.0.0.1, GET only)
+uv run assay scan repo --lab lab.json --llm-plan --llm-url http://127.0.0.1:8088   # local model orders the analysers and proposes steps (validated, logged)
 scripts/demo-lab.sh                        # active step: plan → refused → approve → run once → evidence scanned (offline, fake nmap)
 scripts/demo.sh                            # refusal → scan → explain → approve → apply → verify-log, ~2 s
 uv run assay scan . --out runs/today --baseline runs/yesterday/findings.json --fail-on new   # CI gate (exit 4 on new findings)
@@ -99,7 +101,7 @@ Writing an analyser plugin: implement `name`, `kinds` and `analyse(files, facts)
 ```bash
 scripts/get-samples.sh            # public, intentionally vulnerable repos, pinned commits
 uv run python -m eval.run_eval    # writes eval/results/*.json and SUMMARY.md
-uv run pytest -q                  # 154 tests
+uv run pytest -q                  # 161 tests
 ```
 
 | Test set | Result |
@@ -131,7 +133,9 @@ uv run pytest -q                  # 154 tests
 ## Project layout
 `assay/` contains the agent:
 - `scope.py` (scope guard, `ScopePolicy`), `inventory.py`, `hcl.py` (dependency-free Terraform parser), `plugins.py` (analyser registry), `rules/` (`terraform.py`, `kubernetes.py`, `misc.py`, `secrets.py`, `toolout.py`);
-- `correlate.py`, `actions.py` (approval gate, keyed audit log), `explain.py`, `narrate.py` (optional local model, grounded), `report.py`, `html.py`, `agent.py`, `cli.py`.
+- `planner.py` (optional LLM planner), `steps.py` (plan/approve/run), `ui.py` (read-only web page), `correlate_events.py`, `correlate.py`, `actions.py` (approval gate, keyed audit log), `explain.py`, `narrate.py` (optional local model, grounded), `report.py`, `html.py`, `agent.py`, `cli.py`.
+
+**LLM planner (optional, local llama.cpp only, $0).** With `--llm-plan` the model orders the analysers and gives a reason for each, and, under a lab allowlist, proposes up to three follow-up active steps. Its output is schema-constrained (enums are the real analyser names, declared tool profiles and permitted hosts) and validated again; invalid output falls back to the deterministic plan and the rejection is logged. It cannot enable a skipped analyser, drop one that has files, or approve anything: proposals are written as planned steps that a named person must approve with `assay step approve`. Each call is recorded in the audit log with the sha256 of the prompt and answer. Honest scope: ordering does not change which findings exist; the gain is a visible, explained, auditable plan and step proposals. `scripts/llm-plan-demo.sh` runs it under the heavy-job lock and stops the server afterwards (tested with Gemma 4 E2B Q4_0).
 
 `runners.py` is the gated active-step runner (dry-run and declared command profiles; it refuses to run without an audit log) and `steps.py` is the human flow on top of it: `assay step plan | approve | run`, with the approval bound to the exact command, host and lab file and recorded in the keyed audit log (single use). `docs/EVENT-PLAYBOOK.md` explains how to extend the kernel for a new problem in days. `eval/` holds the fixtures, labels and runner. `tests/` holds the unit, safety and policy tests. `templates/event-repo/` is the provenance-first skeleton for a project that depends on Assay. `docs/` has the write-up, the video storyboard and a lab-file example.
 

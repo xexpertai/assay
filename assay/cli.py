@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -21,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--out", default="runs/latest")
     s.add_argument("--llm", action="store_true", help="ask a local llama.cpp server for the briefing")
     s.add_argument("--llm-url", default=None)
+    s.add_argument("--llm-plan", action="store_true",
+                   help="let a local llama.cpp model order the analysers and propose follow-up active steps "
+                        "(validated; steps are only planned, a named human still approves them)")
     s.add_argument("--baseline", default=None, metavar="FINDINGS_JSON",
                    help="a previous run's findings.json; report new / fixed / unchanged and set SARIF baselineState")
     s.add_argument("--fail-on", choices=["none", "new", "any"], default="none",
@@ -59,6 +63,9 @@ def main(argv: list[str] | None = None) -> int:
     sr.add_argument("step_id")
     sr.add_argument("--dry-run", action="store_true")
     sr.add_argument("--timeout", type=int, default=600)
+    u = sub.add_parser("ui", help="read-only local web page over a run directory (127.0.0.1 only)")
+    u.add_argument("run_dir")
+    u.add_argument("--port", type=int, default=8765)
     args = p.parse_args(argv)
 
     try:
@@ -66,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
             from .agent import run
             policy = ScopePolicy.from_lab_file(args.lab) if args.lab else ScopePolicy.files_only()
             res = run(args.target, Path(args.out), use_llm=args.llm, llm_url=args.llm_url, policy=policy,
-                      baseline=Path(args.baseline) if args.baseline else None)
+                      baseline=Path(args.baseline) if args.baseline else None,
+                      planner_url=(args.llm_url or os.environ.get("ASSAY_LLM_URL", "http://127.0.0.1:8088")) if args.llm_plan else None)
             c = res.counts
             print(f"Assay: {c['findings']} findings, {c['chains']} chains, {len(res.actions)} proposed actions "
                   f"(nothing applied). Report: {Path(args.out) / 'report.md'} (+ report.html, report.sarif, findings.json)")
@@ -81,6 +89,15 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  gate: {len(gate)} {'new ' if args.fail_on == 'new' else ''}finding(s) at or above "
                       f"{args.fail_min_severity}; exiting 4", file=sys.stderr)
                 return 4
+            return 0
+        if args.cmd == "ui":
+            from .ui import serve
+            srv = serve(Path(args.run_dir), args.port)
+            print(f"Assay UI (read-only) on http://127.0.0.1:{srv.server_address[1]}  - Ctrl-C to stop")
+            try:
+                srv.serve_forever()
+            except KeyboardInterrupt:
+                srv.server_close()
             return 0
         if args.cmd == "step":
             from . import steps

@@ -19,4 +19,5 @@ step uv run assay apply runs/demo/run                                       # 4.
 step uv run assay approve runs/demo/run "$ACTION" --by "Demo Approver"      # 5. a named person approves one action
 step uv run assay apply runs/demo/run                                       # 6. only that action is applied
 step uv run assay verify-log runs/demo/run                                  # 7. keyed, hash-chained audit log
+step scripts/demo-dataops.sh                                                # 8. event logs + DataOps configs: kill chain, Airflow/Kafka/SQL chains, pending step
 echo; echo "Reports: runs/demo/run/report.html (open in a browser), report.md, report.sarif, findings.json"
