@@ -208,6 +208,7 @@
       "case": "events_cloudtrail",
       "safe_case": false,
       "expected": [
+        "EVT-BRUTE-FORCE-SUCCESS",
         "EVT-LOGGING-OFF",
         "EVT-LOGIN-BURST",
         "EVT-LOGIN-NO-MFA",
@@ -215,6 +216,7 @@
         "EVT-PRIV-ESC"
       ],
       "got": [
+        "EVT-BRUTE-FORCE-SUCCESS",
         "EVT-LOGGING-OFF",
         "EVT-LOGIN-BURST",
         "EVT-LOGIN-NO-MFA",
@@ -957,7 +959,7 @@
   ],
   "n_cases": 70,
   "passed": 70,
-  "rule_hits_tp": 112,
+  "rule_hits_tp": 113,
   "rule_hits_fp": 0,
   "rule_hits_fn": 0,
   "precision": 1.0,

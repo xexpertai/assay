@@ -12,7 +12,7 @@
     },
     "variable": {
       "labels": 4,
-      "detected": 3
+      "detected": 2
     },
     "none": {
       "labels": 51,
@@ -865,10 +865,8 @@
         "TF-AWS-UNRESOLVED-EXPOSURE"
       ],
       "note": "acl = var.bucket_acl; post-blind: Assay now reports a low-confidence 'depends on a variable' finding",
-      "detected": true,
-      "by": [
-        "TF-AWS-UNRESOLVED-EXPOSURE"
-      ]
+      "detected": false,
+      "by": []
     },
     {
       "module": "s3",
@@ -1046,7 +1044,7 @@
     "TF-AWS-S3-NO-ENCRYPTION": 6,
     "TF-AWS-S3-NO-LOGGING": 6,
     "TF-AWS-EKS-PUBLIC-ENDPOINT": 1,
-    "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK": 5,
+    "TF-AWS-S3-NO-PUBLIC-ACCESS-BLOCK": 6,
     "TF-AWS-ES-UNENCRYPTED": 1,
     "TF-AWS-EBS-UNENCRYPTED": 1,
     "TF-AWS-EBS-SNAPSHOT-UNENCRYPTED": 1,
@@ -1056,7 +1054,7 @@
     "TF-AWS-ELB-NO-LOGS": 1,
     "TF-AWS-EC2-IMDSV1": 1,
     "TF-AWS-KMS-NO-ROTATION": 1,
-    "TF-AWS-UNRESOLVED-EXPOSURE": 2,
+    "TF-AWS-UNRESOLVED-EXPOSURE": 1,
     "TF-AWS-SG-INTERNET-FACING": 4
   },
   "chains": [
@@ -1064,6 +1062,6 @@
     "One credential appears in 2 places",
     "Publicly reachable data store aws_s3_bucket.public lacks protection or audit trail"
   ],
-  "wall_s": 0.21,
+  "wall_s": 0.26,
   "files": 82
 }

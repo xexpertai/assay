@@ -96,6 +96,6 @@
     "Job/kube-bench-node combines several container-escape weaknesses",
     "Job/kube-bench-master combines several container-escape weaknesses"
   ],
-  "wall_s": 0.57,
+  "wall_s": 0.46,
   "files": 122
 }

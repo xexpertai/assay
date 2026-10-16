@@ -31,7 +31,7 @@ Meanwhile the most damaging problems are *combinations*: an open SSH port **plus
 - **Tests:** 161 automated tests. A full scan of any sample repo takes under a second on a laptop CPU. The deterministic core needs no GPU and no cloud.
 
 ## Limits (stated plainly)
-- This is a static review plus ingestion of evidence files: Assay does not run scanners, test running systems or prove exploitability. The observed-vs-configured chain matches by port number and says so.
+- This is a static review plus ingestion of evidence files: by default Assay runs no scanners and never tests running systems (an active step runs only via `assay step run`, inside a lab allowlist, after a named approval), and it does not prove exploitability. The observed-vs-configured chain matches by port number and says so.
 - Variables are resolved from tfvars files and root-module defaults only (module arguments are followed one level, literals only); other expressions lower confidence instead. `file()`/`templatefile()` user data is not followed.
 - Cloud coverage is AWS plus basic GCP; many AWS services (CloudTrail trail settings, password policy, Redshift, ELBv2) have no rules.
 - The fixture suite was written alongside the rules, so it shows behaviour, not independent accuracy.
